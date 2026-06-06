@@ -16,7 +16,6 @@ export interface SignupBody {
   email: string
   password: string
   username?: string
-  role?: string
 }
 
 export interface SigninBody {

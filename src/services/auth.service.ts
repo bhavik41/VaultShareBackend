@@ -40,6 +40,12 @@ function generateOtp(): string {
   return crypto.randomInt(100000, 999999).toString()
 }
 
+export function getMe(userId: string) {
+  const user = findUserById(userId)
+  if (!user) throw new Error("User not found.")
+  return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt, twoFactorEnabled: user.twoFactorEnabled }
+}
+
 export async function signup(data: SignupBody) {
   const { name, email, password } = data
   if (password.length < 6) throw new Error("Password must be at least 6 characters.")

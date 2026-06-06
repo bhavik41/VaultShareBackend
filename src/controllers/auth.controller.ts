@@ -82,7 +82,12 @@ export class AuthController {
   }
 
   static me(req: Request, res: Response): void {
-    res.status(200).json({ user: req.user })
+    try {
+      const user = authService.getMe(req.user!.id)
+      res.status(200).json({ user })
+    } catch (error: any) {
+      res.status(404).json({ message: error.message })
+    }
   }
 
   static async forgotPassword(req: Request<object, object, ForgotPasswordBody>, res: Response): Promise<void> {

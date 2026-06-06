@@ -29,6 +29,7 @@ const transporter = createTransport()
 
 export const sendPasswordResetEmail = async (to: string, otp: string): Promise<void> => {
   await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
     to,
     subject: "VaultShare — Password Reset Code",
     text: `Your one-time password reset code is: ${otp}\n\nThis code expires in 10 minutes.`,

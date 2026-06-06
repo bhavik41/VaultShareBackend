@@ -5,9 +5,13 @@ import authRouter from "./routes/auth.js"
 const app = express()
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:4173"],
+    origin: allowedOrigins,
     credentials: true,
   }),
 )
