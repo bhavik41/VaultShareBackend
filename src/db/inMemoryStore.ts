@@ -9,6 +9,14 @@ export interface StoredUser {
   email: string
   passwordHash: string
   createdAt: Date
+  // Session
+  refreshToken: string | null
+  // 2FA
+  twoFactorSecret: string | null
+  twoFactorEnabled: boolean
+  // Password reset
+  resetOtp: string | null
+  resetOtpExpiry: Date | null
 }
 
 const users: Map<string, StoredUser> = new Map()
@@ -24,9 +32,24 @@ export const findUserById = (id: string): StoredUser | undefined => {
   return users.get(id)
 }
 
+export const findUserByRefreshToken = (token: string): StoredUser | undefined => {
+  for (const user of users.values()) {
+    if (user.refreshToken === token) return user
+  }
+  return undefined
+}
+
 export const createUser = (user: StoredUser): StoredUser => {
   users.set(user.id, user)
   return user
+}
+
+export const updateUser = (id: string, updates: Partial<StoredUser>): StoredUser | undefined => {
+  const user = users.get(id)
+  if (!user) return undefined
+  const updated = { ...user, ...updates }
+  users.set(id, updated)
+  return updated
 }
 
 export const getAllUsers = (): StoredUser[] => {
