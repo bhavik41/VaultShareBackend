@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { v4 as uuidv4 } from "../utils/uuid.js"
 import { findUserByEmail, createUser } from "../db/inMemoryStore.js"
-import { SignupBody, UserPayload } from "../types/index.js"
+import { SignupBody, SigninBody, UserPayload } from "../types/index.js"
+import { authenticate } from "../middleware/auth.js"
 
 const router = Router()
 
@@ -64,6 +65,54 @@ router.post("/signup", async (req: Request<object, object, SignupBody>, res: Res
       createdAt: newUser.createdAt,
     },
   })
+})
+
+// ── POST /api/auth/signin ─────────────────────────────────────────────────────
+router.post("/signin", async (req: Request<object, object, SigninBody>, res: Response): Promise<void> => {
+  const { email, password } = req.body
+
+  if (!email || !password) {
+    res.status(400).json({ message: "Email and password are required." })
+    return
+  }
+
+  const user = findUserByEmail(email)
+  if (!user) {
+    res.status(401).json({ message: "Invalid email or password." })
+    return
+  }
+
+  const isValid = await bcrypt.compare(password, user.passwordHash)
+  if (!isValid) {
+    res.status(401).json({ message: "Invalid email or password." })
+    return
+  }
+
+  const payload: UserPayload = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+  }
+
+  const token = jwt.sign(payload, process.env.JWT_SECRET as string, {
+    expiresIn: "7d",
+  })
+
+  res.status(200).json({
+    message: "Signed in successfully.",
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+    },
+  })
+})
+
+// ── GET /api/auth/me ──────────────────────────────────────────────────────────
+router.get("/me", authenticate, (req: Request, res: Response): void => {
+  res.status(200).json({ user: req.user })
 })
 
 export default router
