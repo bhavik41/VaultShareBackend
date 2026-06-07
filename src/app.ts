@@ -1,34 +1,36 @@
-import express from "express"
-import cors from "cors"
-import authRouter from "./routes/auth.js"
+import express from "express";
+import cors from "cors";
+import authRouter from "./routes/auth";
+import filesRouter from "./routes/files";
 
-const app = express()
+const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
   .split(",")
-  .map((o) => o.trim())
+  .map((o) => o.trim());
 
 app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
   }),
-)
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use("/api/auth", authRouter)
+app.use("/api/auth", authRouter);
+app.use("/api/files", filesRouter);
 
 // Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() })
-})
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 // 404 handler
 app.use((_req, res) => {
-  res.status(404).json({ message: "Route not found" })
-})
+  res.status(404).json({ message: "Route not found" });
+});
 
-export default app
+export default app;
