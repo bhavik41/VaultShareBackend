@@ -3,6 +3,7 @@ import { getFileById } from "../db/fileStore";
 import { findUserByEmail, findUserById } from "../db/inMemoryStore";
 import {
   CollaborationInvitation,
+  FileShare,
   SharedRole,
   createFileShare,
   createInvitation,
@@ -11,6 +12,10 @@ import {
   getInvitationById,
   getInvitationsByFile,
   getInvitationsForUser,
+  getSharesByFile,
+  getSharesByUser,
+  removeFileShare,
+  updateFileShareRole,
   updateInvitationStatus,
 } from "../db/collaborationStore";
 
@@ -19,6 +24,26 @@ interface InviteCollaboratorInput {
   inviterId: string;
   inviteeEmail: string;
   role: string;
+}
+
+interface ShareFileInput {
+  fileId: string;
+  ownerId: string;
+  collaboratorEmail: string;
+  role: string;
+}
+
+interface SharedFileResult {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  ownerId: string;
+  ownerName: string;
+  ownerEmail: string;
+  role: SharedRole;
+  createdAt: Date;
+  sharedAt: Date;
 }
 
 export function validateSharedRole(role: string): SharedRole {
@@ -139,4 +164,108 @@ export function respondToInvitation(
     invitation: updatedInvitation,
     share,
   };
+}
+
+export function shareFileWithUser(input: ShareFileInput): FileShare {
+  const { fileId, ownerId, collaboratorEmail } = input;
+  const role = validateSharedRole(input.role);
+
+  const file = requireFileOwner(fileId, ownerId);
+  const collaborator = findUserByEmail(collaboratorEmail);
+
+  if (!collaborator) {
+    throw new Error("Collaborator must have a registered account.");
+  }
+
+  if (collaborator.id === ownerId) {
+    throw new Error("You cannot share a file with yourself.");
+  }
+
+  const existingShare = getFileShare(file.id, collaborator.id);
+  if (existingShare) {
+    throw new Error("This user already has access to the file.");
+  }
+
+  return createFileShare({
+    id: uuidv4(),
+    fileId: file.id,
+    ownerId,
+    userId: collaborator.id,
+    role,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+}
+
+export function listSharedUsers(fileId: string, ownerId: string) {
+  const file = requireFileOwner(fileId, ownerId);
+
+  return getSharesByFile(file.id).map((share) => {
+    const user = findUserById(share.userId);
+
+    return {
+      id: share.id,
+      fileId: share.fileId,
+      userId: share.userId,
+      name: user?.name ?? "Unknown user",
+      email: user?.email ?? "",
+      role: share.role,
+      createdAt: share.createdAt,
+      updatedAt: share.updatedAt,
+    };
+  });
+}
+
+export function updateCollaboratorPermission(
+  fileId: string,
+  ownerId: string,
+  collaboratorId: string,
+  role: string,
+): FileShare {
+  const validRole = validateSharedRole(role);
+  requireFileOwner(fileId, ownerId);
+
+  const updatedShare = updateFileShareRole(fileId, collaboratorId, validRole);
+  if (!updatedShare) {
+    throw new Error("Collaborator not found.");
+  }
+
+  return updatedShare;
+}
+
+export function removeCollaborator(
+  fileId: string,
+  ownerId: string,
+  collaboratorId: string,
+): void {
+  requireFileOwner(fileId, ownerId);
+
+  const removed = removeFileShare(fileId, collaboratorId);
+  if (!removed) {
+    throw new Error("Collaborator not found.");
+  }
+}
+
+export function listFilesSharedWithMe(userId: string): SharedFileResult[] {
+  return getSharesByUser(userId)
+    .map((share) => {
+      const file = getFileById(share.fileId);
+      if (!file) return null;
+
+      const owner = findUserById(share.ownerId);
+
+      return {
+        id: file.id,
+        name: file.originalName,
+        mimeType: file.mimeType,
+        size: file.size,
+        ownerId: share.ownerId,
+        ownerName: owner?.name ?? "Unknown user",
+        ownerEmail: owner?.email ?? "",
+        role: share.role,
+        createdAt: file.createdAt,
+        sharedAt: share.createdAt,
+      };
+    })
+    .filter((file): file is SharedFileResult => file !== null);
 }
