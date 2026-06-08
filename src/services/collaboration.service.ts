@@ -1,20 +1,26 @@
+import crypto from "crypto";
 import { v4 as uuidv4 } from "../utils/uuid";
 import { getFileById } from "../db/fileStore";
 import { findUserByEmail, findUserById } from "../db/inMemoryStore";
 import {
   CollaborationInvitation,
   FileShare,
+  ShareLink,
   SharedRole,
   createFileShare,
   createInvitation,
+  createShareLink,
   findPendingInvitation,
   getFileShare,
   getInvitationById,
   getInvitationsByFile,
   getInvitationsForUser,
+  getShareLinkByToken,
+  getShareLinksByFile,
   getSharesByFile,
   getSharesByUser,
   removeFileShare,
+  revokeShareLink,
   updateFileShareRole,
   updateInvitationStatus,
 } from "../db/collaborationStore";
@@ -31,6 +37,13 @@ interface ShareFileInput {
   ownerId: string;
   collaboratorEmail: string;
   role: string;
+}
+
+interface CreateShareLinkInput {
+  fileId: string;
+  ownerId: string;
+  role: string;
+  expiresAt?: string;
 }
 
 interface SharedFileResult {
@@ -56,6 +69,28 @@ function requireFileOwner(fileId: string, userId: string) {
   if (!file) throw new Error("File not found.");
   if (file.userId !== userId) throw new Error("Access denied.");
   return file;
+}
+
+function generateShareToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function parseExpirationDate(expiresAt?: string): Date {
+  if (!expiresAt) {
+    return new Date(Date.now() + 24 * 60 * 60 * 1000);
+  }
+
+  const expirationDate = new Date(expiresAt);
+
+  if (Number.isNaN(expirationDate.getTime())) {
+    throw new Error("expiresAt must be a valid date.");
+  }
+
+  if (expirationDate <= new Date()) {
+    throw new Error("expiresAt must be in the future.");
+  }
+
+  return expirationDate;
 }
 
 export function inviteCollaborator(
@@ -268,4 +303,74 @@ export function listFilesSharedWithMe(userId: string): SharedFileResult[] {
       };
     })
     .filter((file): file is SharedFileResult => file !== null);
+}
+
+export function createFileShareLink(input: CreateShareLinkInput): ShareLink {
+  const { fileId, ownerId } = input;
+  const role = validateSharedRole(input.role);
+  const file = requireFileOwner(fileId, ownerId);
+
+  return createShareLink({
+    id: uuidv4(),
+    fileId: file.id,
+    ownerId,
+    token: generateShareToken(),
+    role,
+    expiresAt: parseExpirationDate(input.expiresAt),
+    revokedAt: null,
+    createdAt: new Date(),
+  });
+}
+
+export function listFileShareLinks(fileId: string, ownerId: string): ShareLink[] {
+  const file = requireFileOwner(fileId, ownerId);
+  return getShareLinksByFile(file.id);
+}
+
+export function revokeFileShareLink(token: string, ownerId: string): ShareLink {
+  const shareLink = getShareLinkByToken(token);
+  if (!shareLink) throw new Error("Share link not found.");
+
+  if (shareLink.ownerId !== ownerId) {
+    throw new Error("Access denied.");
+  }
+
+  const revokedShareLink = revokeShareLink(token);
+  if (!revokedShareLink) throw new Error("Share link not found.");
+
+  return revokedShareLink;
+}
+
+export function validateShareLinkToken(token: string) {
+  const shareLink = getShareLinkByToken(token);
+  if (!shareLink) throw new Error("Share link not found.");
+
+  if (shareLink.revokedAt) {
+    throw new Error("Share link has been revoked.");
+  }
+
+  if (shareLink.expiresAt <= new Date()) {
+    throw new Error("Share link has expired.");
+  }
+
+  const file = getFileById(shareLink.fileId);
+  if (!file) throw new Error("File not found.");
+
+  const owner = findUserById(shareLink.ownerId);
+
+  return {
+    shareLink,
+    file: {
+      id: file.id,
+      name: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      ownerId: file.userId,
+      ownerName: owner?.name ?? "Unknown user",
+      ownerEmail: owner?.email ?? "",
+      role: shareLink.role,
+      createdAt: file.createdAt,
+      url: file.publicUrl,
+    },
+  };
 }

@@ -11,6 +11,7 @@ function getErrorStatus(message: string): number {
   ) {
     return 409;
   }
+  if (message.includes("expired") || message.includes("revoked")) return 410;
   return 400;
 }
 
@@ -188,6 +189,86 @@ export class CollaborationController {
       res.status(200).json({ files });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  }
+
+  static createShareLink(req: Request, res: Response): void {
+    try {
+      const { fileId } = req.params;
+      const { role, expiresAt } = req.body;
+
+      if (!role) {
+        res.status(400).json({ message: "role is required." });
+        return;
+      }
+
+      const shareLink = collaborationService.createFileShareLink({
+        fileId,
+        ownerId: req.user!.id,
+        role,
+        expiresAt,
+      });
+
+      res.status(201).json({
+        message: "Share link created successfully.",
+        shareLink,
+      });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({
+        message: error.message,
+      });
+    }
+  }
+
+  static listShareLinks(req: Request, res: Response): void {
+    try {
+      const { fileId } = req.params;
+
+      const shareLinks = collaborationService.listFileShareLinks(
+        fileId,
+        req.user!.id,
+      );
+
+      res.status(200).json({ shareLinks });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({
+        message: error.message,
+      });
+    }
+  }
+
+  static revokeShareLink(req: Request, res: Response): void {
+    try {
+      const { token } = req.params;
+      const shareLink = collaborationService.revokeFileShareLink(
+        token,
+        req.user!.id,
+      );
+
+      res.status(200).json({
+        message: "Share link revoked successfully.",
+        shareLink,
+      });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({
+        message: error.message,
+      });
+    }
+  }
+
+  static validateShareLink(req: Request, res: Response): void {
+    try {
+      const { token } = req.params;
+      const result = collaborationService.validateShareLinkToken(token);
+
+      res.status(200).json({
+        message: "Share link is valid.",
+        ...result,
+      });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({
+        message: error.message,
+      });
     }
   }
 }
