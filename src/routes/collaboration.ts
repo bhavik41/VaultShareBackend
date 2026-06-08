@@ -23,4 +23,20 @@ router.patch(
   CollaborationController.respondToInvitation,
 );
 
+router.post("/files/:fileId/share", CollaborationController.shareFileWithUser);
+
+router.get("/files/:fileId/shared-users", CollaborationController.listSharedUsers);
+
+router.patch(
+  "/files/:fileId/collaborators/:userId",
+  CollaborationController.updateCollaboratorPermission,
+);
+
+router.delete(
+  "/files/:fileId/collaborators/:userId",
+  CollaborationController.removeCollaborator,
+);
+
+router.get("/shared-with-me", CollaborationController.listFilesSharedWithMe);
+
 export default router;
