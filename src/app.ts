@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import authRouter from "./routes/auth";
 import filesRouter from "./routes/files";
+import collaborationRouter from "./routes/collaboration";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/files", filesRouter);
+app.use("/api/collaboration", collaborationRouter);
 
 // Health check
 app.get("/health", (_req, res) => {
