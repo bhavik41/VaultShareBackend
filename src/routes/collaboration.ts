@@ -4,6 +4,8 @@ import { authenticate } from "../middleware/auth";
 
 const router = Router();
 
+router.get("/share-links/:token", CollaborationController.validateShareLink);
+
 router.use(authenticate);
 
 router.post(
@@ -25,7 +27,10 @@ router.patch(
 
 router.post("/files/:fileId/share", CollaborationController.shareFileWithUser);
 
-router.get("/files/:fileId/shared-users", CollaborationController.listSharedUsers);
+router.get(
+  "/files/:fileId/shared-users",
+  CollaborationController.listSharedUsers,
+);
 
 router.patch(
   "/files/:fileId/collaborators/:userId",
@@ -38,5 +43,20 @@ router.delete(
 );
 
 router.get("/shared-with-me", CollaborationController.listFilesSharedWithMe);
+
+router.post(
+  "/files/:fileId/share-links",
+  CollaborationController.createShareLink,
+);
+
+router.get(
+  "/files/:fileId/share-links",
+  CollaborationController.listShareLinks,
+);
+
+router.delete(
+  "/share-links/:token",
+  CollaborationController.revokeShareLink,
+);
 
 export default router;
