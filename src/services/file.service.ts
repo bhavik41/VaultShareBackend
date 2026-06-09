@@ -1,6 +1,8 @@
 import { Storage } from "@google-cloud/storage";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
+import { requireFileAccess } from "../utils/accessControl";
+
 import {
   createFile,
   getFileById,
@@ -111,16 +113,14 @@ export async function getSignedUrl(
   fileId: string,
   requestingUserId: string,
 ): Promise<string> {
-  const stored = getFileById(fileId);
-  if (!stored) throw new Error("File not found.");
-  if (stored.userId !== requestingUserId) throw new Error("Access denied.");
+  const { file: stored } = requireFileAccess(fileId, requestingUserId, "view");
 
   const [signedUrl] = await storage
     .bucket(stored.gcsBucket)
     .file(stored.gcsKey)
     .getSignedUrl({
       action: "read",
-      expires: Date.now() + 60 * 60 * 1000, // 1 hour
+      expires: Date.now() + 60 * 60 * 1000,
     });
 
   return signedUrl;
@@ -140,13 +140,10 @@ export async function streamFileDownload(
   mimeType: string;
   size: number;
 }> {
-  const stored = getFileById(fileId);
-  if (!stored) throw new Error("File not found.");
-  if (stored.userId !== requestingUserId) throw new Error("Access denied.");
+  const { file: stored } = requireFileAccess(fileId, requestingUserId, "view");
 
   const gcsFile = storage.bucket(stored.gcsBucket).file(stored.gcsKey);
 
-  // Verify the object still exists in GCS before streaming
   const [exists] = await gcsFile.exists();
   if (!exists) throw new Error("File no longer exists in storage.");
 
@@ -167,9 +164,7 @@ export async function deleteFile(
   fileId: string,
   requestingUserId: string,
 ): Promise<void> {
-  const stored = getFileById(fileId);
-  if (!stored) throw new Error("File not found.");
-  if (stored.userId !== requestingUserId) throw new Error("Access denied.");
+  const { file: stored } = requireFileAccess(fileId, requestingUserId, "owner");
 
   await storage
     .bucket(stored.gcsBucket)
