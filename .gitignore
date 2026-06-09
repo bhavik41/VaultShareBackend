@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 *.js.map
+gcp-service-account.json
+vaultshare-*.json
