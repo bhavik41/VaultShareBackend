@@ -3,6 +3,7 @@ import cors from "cors";
 import authRouter from "./routes/auth";
 import filesRouter from "./routes/files";
 import collaborationRouter from "./routes/collaboration";
+import dashboardRouter from "./routes/dashboard";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/collaboration", collaborationRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 // Health check
 app.get("/health", (_req, res) => {
