@@ -77,6 +77,19 @@ SMTP_PASS=your_16_char_app_password
 | `POST` | `/api/auth/2fa/validate` | Public | Validate TOTP during login (exchanges temp token for full JWT) |
 | `DELETE` | `/api/auth/2fa/disable` | Bearer JWT | Disable 2FA using TOTP code |
 
+### Dashboard & Document Management
+
+Contributed by NishthaPandya07.
+
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| `GET` | `/api/dashboard/files` | Bearer JWT | Get owned and shared dashboard files with search, filters, and sorting |
+| `GET` | `/api/dashboard/stats` | Bearer JWT | Get dashboard file statistics and summary counts |
+| `GET` | `/api/dashboard/activity` | Bearer JWT | Get recent file-related activity for the current user |
+| `GET` | `/api/dashboard/files/:fileId` | Bearer JWT | Get document metadata and access information |
+
+The dashboard APIs connect the frontend dashboard to file records, document metadata, ownership/access information, and recent file activity.
+
 ### Health
 
 | Method | Route | Description |
