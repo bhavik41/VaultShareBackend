@@ -1,119 +1,86 @@
 ﻿import { v4 as uuidv4 } from "uuid"
-import { AuditLogModel } from "../models/AuditLog"
+import { AuditLogModel, IAuditLog, AuditAction } from "../models/AuditLog"
 
-export type AuditAction =
-  | "upload"
-  | "download"
-  | "view"
-  | "share"
-  | "permission_change"
-  | "delete"
+export type { AuditAction }
 
-export interface AuditLog {
-  id: string
-  fileId: string
-  userId: string
-  action: AuditAction
-  details?: string
-  ipAddress?: string
-  userAgent?: string
-  timestamp: Date
-}
+export interface AuditLog extends IAuditLog {}
 
-function toAuditLog(doc: any): AuditLog {
-  return {
-    id: doc._id,
-    fileId: doc.fileId,
-    userId: doc.userId,
-    action: doc.action,
-    details: doc.details,
-    ipAddress: doc.ipAddress,
-    userAgent: doc.userAgent,
-    timestamp: doc.timestamp,
-  }
-}
-
-// In-memory dedup cache for view events: fileId:userId → last logged timestamp
-// Node.js is single-threaded so Map operations are race-free
-const viewDedupeCache = new Map<string, number>()
-const VIEW_DEDUPE_MS = 5 * 60 * 1000 // 5 minutes
-
-export const createAuditLog = async (
+export async function createAuditLog(
   fileId: string,
   userId: string,
   action: AuditAction,
   details?: string,
-  meta?: { ipAddress?: string; userAgent?: string },
-): Promise<AuditLog | null> => {
-  if (action === 'view') {
-    const key = `${fileId}:${userId}`
-    const last = viewDedupeCache.get(key)
-    const now = Date.now()
-    if (last && now - last < VIEW_DEDUPE_MS) return null
-    viewDedupeCache.set(key, now)
-  }
-
-  const doc = await AuditLogModel.create({
+  metadata?: Record<string, unknown>,
+): Promise<AuditLog> {
+  const doc = new AuditLogModel({
     _id: uuidv4(),
     fileId,
     userId,
     action,
     details,
-    ipAddress: meta?.ipAddress,
-    userAgent: meta?.userAgent,
+    metadata,
     timestamp: new Date(),
   })
-  return toAuditLog(doc)
+  await doc.save()
+  return doc.toObject()
 }
 
-export const getAuditLogsByFile = async (
+export async function getAuditLogsByFile(
   fileId: string,
   filters?: { action?: AuditAction },
-): Promise<AuditLog[]> => {
+): Promise<AuditLog[]> {
   const query: Record<string, unknown> = { fileId }
   if (filters?.action) query.action = filters.action
-  const docs = await AuditLogModel.find(query).sort({ timestamp: -1 })
-  return docs.map(toAuditLog)
+  return AuditLogModel.find(query).sort({ timestamp: -1 }).lean()
 }
 
-export const getAuditLogsByUser = async (
+export async function getAuditLogsByUser(
   userId: string,
-  options?: { actions?: AuditAction[]; limit?: number; offset?: number },
-): Promise<{ logs: AuditLog[]; total: number }> => {
+  opts?: { actions?: AuditAction[]; limit?: number; offset?: number },
+): Promise<{ logs: AuditLog[]; total: number }> {
   const query: Record<string, unknown> = { userId }
-  if (options?.actions?.length) query.action = { $in: options.actions }
-
+  if (opts?.actions?.length) query.action = { $in: opts.actions }
   const total = await AuditLogModel.countDocuments(query)
-  const docs = await AuditLogModel.find(query)
+  const logs = await AuditLogModel.find(query)
     .sort({ timestamp: -1 })
-    .skip(options?.offset ?? 0)
-    .limit(options?.limit ?? 50)
-
-  return { logs: docs.map(toAuditLog), total }
+    .skip(opts?.offset ?? 0)
+    .limit(opts?.limit ?? 50)
+    .lean()
+  return { logs, total }
 }
 
-export const getAuditLogCountByAction = async (
+export async function getAuditLogCountByAction(
   fileId: string,
-): Promise<Record<AuditAction, number>> => {
-  const result = await AuditLogModel.aggregate([
+): Promise<Record<AuditAction, number>> {
+  const counts = await AuditLogModel.aggregate([
     { $match: { fileId } },
     { $group: { _id: "$action", count: { $sum: 1 } } },
   ])
-  const counts: Record<string, number> = {}
-  result.forEach((r) => { counts[r._id] = r.count })
-  return counts as Record<AuditAction, number>
+  const result: Partial<Record<AuditAction, number>> = {}
+  for (const c of counts) result[c._id as AuditAction] = c.count
+  return result as Record<AuditAction, number>
 }
 
-
-export const getAuditLogsByDateRange = async (
+export async function getAuditLogsByDateRange(
   fileId: string,
   from: Date,
   to: Date,
-): Promise<AuditLog[]> => {
-  const docs = await AuditLogModel.find({
-    fileId,
-    timestamp: { $gte: from, $lte: to },
-  }).sort({ timestamp: -1 })
-  return docs.map(toAuditLog)
+): Promise<AuditLog[]> {
+  return AuditLogModel.find({ fileId, timestamp: { $gte: from, $lte: to } })
+    .sort({ timestamp: -1 })
+    .lean()
 }
 
+// Dedup: prevent duplicate view logs within a short window (race-condition safe)
+const viewDebounce = new Map<string, number>()
+export async function createViewLogDeduped(
+  fileId: string,
+  userId: string,
+  windowMs = 5000,
+): Promise<void> {
+  const key = ${fileId}:
+  const last = viewDebounce.get(key) ?? 0
+  if (Date.now() - last < windowMs) return
+  viewDebounce.set(key, Date.now())
+  await createAuditLog(fileId, userId, "view")
+}
