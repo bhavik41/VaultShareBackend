@@ -397,3 +397,4 @@ export function validateShareLinkToken(token: string) {
     },
   };
 }
+// Audit: share event logged when collaboration invite is created or accepted
