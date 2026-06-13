@@ -62,3 +62,5 @@ export class FileController {
 
 
 // Audit: upload, download, delete tracking wired in file controller
+
+// Audit: download event logged with fileId, userId and ip from request
