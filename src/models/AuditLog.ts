@@ -7,6 +7,9 @@ export type AuditAction =
   | "share"
   | "permission_change"
   | "delete"
+  | "revoke_access"
+  | "star"
+  | "invitation_accepted"
 
 export interface IAuditLog {
   _id: string
@@ -16,6 +19,7 @@ export interface IAuditLog {
   details?: string
   ipAddress?: string
   userAgent?: string
+  metadata?: Record<string, unknown>
   timestamp: Date
 }
 
@@ -25,24 +29,23 @@ const auditLogSchema = new Schema<IAuditLog>({
   userId: { type: String, required: true, index: true },
   action: {
     type: String,
-    enum: ["upload", "download", "view", "share", "permission_change", "delete"],
+    enum: [
+      "upload", "download", "view", "share",
+      "permission_change", "delete", "revoke_access", "star",
+      "invitation_accepted",
+    ],
     required: true,
   },
   details: { type: String },
   ipAddress: { type: String },
   userAgent: { type: String },
+  metadata: { type: Schema.Types.Mixed },
   timestamp: { type: Date, default: () => new Date(), index: true },
 })
 
-// Compound index for fast per-file time-range queries
+// Compound indexes for fast per-file and per-user time-range queries
 auditLogSchema.index({ fileId: 1, timestamp: -1 })
-// Compound index for fast per-user activity queries
 auditLogSchema.index({ userId: 1, timestamp: -1 })
+auditLogSchema.index({ userId: 1, action: 1, timestamp: -1 })
 
 export const AuditLogModel = model<IAuditLog>("AuditLog", auditLogSchema)
-
-
-// Performance note added June 14:
-// auditLogSchema.index({ userId: 1, action: 1, timestamp: -1 })
-// This index speeds up filtered activity feed queries (actions filter in getUserActivityHistory)
-

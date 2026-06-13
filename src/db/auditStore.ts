@@ -33,13 +33,26 @@ function toAuditLog(doc: any): AuditLog {
   }
 }
 
+// In-memory dedup cache for view events: fileId:userId → last logged timestamp
+// Node.js is single-threaded so Map operations are race-free
+const viewDedupeCache = new Map<string, number>()
+const VIEW_DEDUPE_MS = 5 * 60 * 1000 // 5 minutes
+
 export const createAuditLog = async (
   fileId: string,
   userId: string,
   action: AuditAction,
   details?: string,
   meta?: { ipAddress?: string; userAgent?: string },
-): Promise<AuditLog> => {
+): Promise<AuditLog | null> => {
+  if (action === 'view') {
+    const key = `${fileId}:${userId}`
+    const last = viewDedupeCache.get(key)
+    const now = Date.now()
+    if (last && now - last < VIEW_DEDUPE_MS) return null
+    viewDedupeCache.set(key, now)
+  }
+
   const doc = await AuditLogModel.create({
     _id: uuidv4(),
     fileId,
