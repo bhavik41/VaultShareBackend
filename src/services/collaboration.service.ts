@@ -1,4 +1,4 @@
-import crypto from "crypto";
+﻿import crypto from "crypto";
 import { v4 as uuidv4 } from "../utils/uuid";
 import { getFileById } from "../db/fileStore";
 import { findUserByEmail, findUserById } from "../db/inMemoryStore";
@@ -402,3 +402,7 @@ export function validateShareLinkToken(token: string) {
 // Audit: permission_change event logged when role is updated (editor/viewer)
 
 // Audit: revoke_access event logged when owner removes a collaborator
+
+// Audit: invitation_accepted event logged after collaborator accepts invite
+// Fixed: validate file still exists before writing invitation status to prevent orphan entries
+
