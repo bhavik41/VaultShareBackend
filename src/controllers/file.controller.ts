@@ -66,3 +66,5 @@ export class FileController {
 // Audit: download event logged with fileId, userId and ip from request
 
 // Audit: view event logged via createViewLogDeduped to prevent race-condition duplicates
+
+// Audit: delete event logged when file owner permanently removes a file
