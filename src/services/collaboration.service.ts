@@ -398,3 +398,5 @@ export function validateShareLinkToken(token: string) {
   };
 }
 // Audit: share event logged when collaboration invite is created or accepted
+
+// Audit: permission_change event logged when role is updated (editor/viewer)
