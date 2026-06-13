@@ -7,6 +7,7 @@ export interface EnrichedAuditLog extends AuditLog {
   userName: string
   userEmail: string
   fileOwnerName: string
+  fileOwnerId: string
 }
 
 export interface AuditSummary {
@@ -21,8 +22,9 @@ export function logAction(
   userId: string,
   action: AuditAction,
   details?: string,
+  metadata?: Record<string, unknown>,
 ): void {
-  createAuditLog(fileId, userId, action, details).catch((err) => {
+  createAuditLog(fileId, userId, action, details, metadata).catch((err) => {
     console.error("[audit] Failed to write audit log:", err)
   })
 }
@@ -39,8 +41,7 @@ export async function getFileAuditHistory(
   const fileOwnerName = fileOwner?.name ?? "Unknown"
   const fileOwnerId = file.userId
 
-  let logs = await getAuditLogsByFile(fileId, filters)
-
+  const logs = await getAuditLogsByFile(fileId, filters)
   const total = logs.length
   const limit = pagination?.limit ?? 50
   const offset = pagination?.offset ?? 0
@@ -55,20 +56,14 @@ export async function getFileAuditHistory(
         cached = { name: user?.name ?? "Unknown User", email: user?.email ?? "" }
         userCache.set(log.userId, cached)
       }
-      return { ...log, userName: cached.name, userEmail: cached.email, fileOwnerName }
+      return { ...log, userName: cached.name, userEmail: cached.email, fileOwnerName, fileOwnerId }
     }),
   )
 
-  // Build audit summary for the file
   const byAction = await getAuditLogCountByAction(fileId)
   const uniqueUsers = new Set(logs.map((l) => l.userId)).size
   const lastActivityAt = logs.length > 0 ? logs[0].timestamp : null
-  const summary: AuditSummary = {
-    totalEvents: total,
-    byAction,
-    uniqueUsers,
-    lastActivityAt,
-  }
+  const summary: AuditSummary = { totalEvents: total, byAction, uniqueUsers, lastActivityAt }
 
   return { logs: enrichedLogs, total, fileOwnerName, fileOwnerId, summary }
 }
@@ -106,4 +101,21 @@ export async function getUserActivityHistory(
   )
 
   return { activities, total }
+}
+
+export interface UserStats {
+  totalEvents: number
+  todayEvents: number
+  topAction: AuditAction | null
+}
+
+export async function getUserStats(userId: string): Promise<UserStats> {
+  const { logs, total } = await getAuditLogsByUser(userId, { limit: 1000 })
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayEvents = logs.filter((l) => new Date(l.timestamp) >= today).length
+  const actionCounts: Partial<Record<AuditAction, number>> = {}
+  for (const l of logs) actionCounts[l.action] = (actionCounts[l.action] ?? 0) + 1
+  const topAction = Object.entries(actionCounts).sort(([, a], [, b]) => b - a)[0]?.[0] as AuditAction | null
+  return { totalEvents: total, todayEvents, topAction }
 }
