@@ -40,3 +40,9 @@ auditLogSchema.index({ fileId: 1, timestamp: -1 })
 auditLogSchema.index({ userId: 1, timestamp: -1 })
 
 export const AuditLogModel = model<IAuditLog>("AuditLog", auditLogSchema)
+
+
+// Performance note added June 14:
+// auditLogSchema.index({ userId: 1, action: 1, timestamp: -1 })
+// This index speeds up filtered activity feed queries (actions filter in getUserActivityHistory)
+
