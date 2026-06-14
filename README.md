@@ -107,3 +107,20 @@ src/
 ```
 
 > **Note:** The current implementation uses an in-memory store. Data resets on server restart. Replace `src/db/inMemoryStore.ts` with a real database (MongoDB, PostgreSQL, etc.) for production.
+
+
+## Audit Logging
+
+Every file operation (upload, download, view, share, permission_change, delete) is automatically recorded in MongoDB with:
+- `userId` and enriched `userName` / `userEmail`
+- `ipAddress` and `userAgent` of the requester
+- `details` string describing the operation
+- `timestamp` indexed for fast range queries
+
+### Endpoints
+| Method | Endpoint                          | Description                          |
+|--------|-----------------------------------|--------------------------------------|
+| GET    | /api/files/:fileId/audit          | File-level audit history (owner only)|
+| GET    | /api/audit/my-activity            | Authenticated user own activity feed |
+| GET    | /api/audit/stats                  | Aggregate counts for dashboard widget|
+
