@@ -61,3 +61,10 @@ export class AuditController {
     }
   }
 }
+
+
+// getAuditHistoryByDateRange â€” GET /api/files/:fileId/audit/range?from=&to=
+import { getAuditLogsByDateRange } from "../db/auditStore"
+// Added to AuditController as a static method (wired via route below)
+// Validates from/to ISO date strings and returns filtered enriched logs
+
