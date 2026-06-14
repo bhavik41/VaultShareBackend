@@ -1,62 +1,18 @@
-import { Router } from "express";
-import { CollaborationController } from "../controllers/collaboration.controller";
-import { authenticate } from "../middleware/auth";
+﻿import { Router } from "express"
+import { authenticate } from "../middleware/auth"
+import { CollaborationController } from "../controllers/collaboration.controller"
 
-const router = Router();
+const router = Router()
 
-router.get("/share-links/:token", CollaborationController.validateShareLink);
+router.get("/pending", authenticate, CollaborationController.getPendingInvitations)
+router.post("/invite", authenticate, CollaborationController.inviteCollaborator)
+router.post("/accept/:invitationId", authenticate, CollaborationController.acceptInvitation)
+router.post("/reject/:invitationId", authenticate, CollaborationController.rejectInvitation)
 
-router.use(authenticate);
+// Owner-only: change role of a collaborator
+router.patch("/:fileId/role/:userId", authenticate, CollaborationController.changeRole)
 
-router.post(
-  "/files/:fileId/invitations",
-  CollaborationController.inviteCollaborator,
-);
+// Owner-only: revoke collaborator access and log revoke_access audit event
+router.delete("/:fileId/revoke/:userId", authenticate, CollaborationController.revokeAccess)
 
-router.get("/invitations", CollaborationController.listMyInvitations);
-
-router.get(
-  "/files/:fileId/invitations",
-  CollaborationController.listFileInvitations,
-);
-
-router.patch(
-  "/invitations/:invitationId/respond",
-  CollaborationController.respondToInvitation,
-);
-
-router.post("/files/:fileId/share", CollaborationController.shareFileWithUser);
-
-router.get(
-  "/files/:fileId/shared-users",
-  CollaborationController.listSharedUsers,
-);
-
-router.patch(
-  "/files/:fileId/collaborators/:userId",
-  CollaborationController.updateCollaboratorPermission,
-);
-
-router.delete(
-  "/files/:fileId/collaborators/:userId",
-  CollaborationController.removeCollaborator,
-);
-
-router.get("/shared-with-me", CollaborationController.listFilesSharedWithMe);
-
-router.post(
-  "/files/:fileId/share-links",
-  CollaborationController.createShareLink,
-);
-
-router.get(
-  "/files/:fileId/share-links",
-  CollaborationController.listShareLinks,
-);
-
-router.delete(
-  "/share-links/:token",
-  CollaborationController.revokeShareLink,
-);
-
-export default router;
+export default router
