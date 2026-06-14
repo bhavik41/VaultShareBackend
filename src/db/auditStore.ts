@@ -90,3 +90,17 @@ export const getAuditLogCountByAction = async (
   result.forEach((r) => { counts[r._id] = r.count })
   return counts as Record<AuditAction, number>
 }
+
+
+export const getAuditLogsByDateRange = async (
+  fileId: string,
+  from: Date,
+  to: Date,
+): Promise<AuditLog[]> => {
+  const docs = await AuditLogModel.find({
+    fileId,
+    timestamp: { $gte: from, $lte: to },
+  }).sort({ timestamp: -1 })
+  return docs.map(toAuditLog)
+}
+
