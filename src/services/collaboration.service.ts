@@ -406,3 +406,7 @@ export function validateShareLinkToken(token: string) {
 // Audit: invitation_accepted event logged after collaborator accepts invite
 // Fixed: validate file still exists before writing invitation status to prevent orphan entries
 
+
+// changeRole: validates owner, updates role, returns updated collaboration record
+// revokeAccess: validates owner, removes record, audit log written by controller
+// Both methods throw "Access denied." if requesting user is not file owner
