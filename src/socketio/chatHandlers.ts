@@ -93,8 +93,9 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
     // Broadcast to all clients in the room (including sender)
     io.to(fileId).emit("message_received", message);
 
-    // Log to audit service
-    auditService.logAction(fileId, userId, "view", content.slice(0, 100));
+    // Log the chat message send event to the audit service.
+    // We use "share" as the closest semantic AuditAction for a collaboration event.
+    auditService.logAction(fileId, userId, "share", `chat: ${content.slice(0, 100)}`);
 
     console.log(`[chat] message in room ${fileId} from ${userName}`);
   });
