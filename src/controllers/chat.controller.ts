@@ -25,6 +25,7 @@ export function getMessageHistory(req: Request, res: Response): void {
  * GET /api/chat/:fileId/online
  *
  * Returns the list of currently connected users in a file room.
+ * Useful for polling-based clients that do not maintain a socket connection.
  */
 export function getOnlineUsersForRoom(req: Request, res: Response): void {
   const { fileId } = req.params;
@@ -35,5 +36,5 @@ export function getOnlineUsersForRoom(req: Request, res: Response): void {
   }
 
   const users = getOnlineUsers(fileId);
-  res.json({ users });
+  res.json({ users, count: users.length });
 }
