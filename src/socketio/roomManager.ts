@@ -27,13 +27,7 @@ export function leaveRoom(fileId: string, socketId: string): OnlineUser | null {
 export function disconnectFromAllRooms(
   socketId: string,
 ): Array<{ fileId: string; user: OnlineUser }> {
-  // Clear any typing indicators this socket may have set
-  for (const [fileId, users] of typingState.entries()) {
-    for (const [userId, state] of users.entries()) {
-      // We identify by socketId stored in onlineUsers — check before clearing
-      void fileId; void userId; void state;
-    }
-  }
+  // Clear any typing indicators this socket may have set across all rooms
   clearTypingForSocketAllRooms(socketId);
   return removeUserFromAllRooms(socketId);
 }
