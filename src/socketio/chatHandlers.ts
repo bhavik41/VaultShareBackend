@@ -43,11 +43,12 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
     const messages = getMessages(fileId, 50);
     socket.emit("message_history", { messages });
 
-    // Send current online users to the joining client
+    // Send current online users to the joining client immediately
     const onlineUsers = getOnlineUsers(fileId);
     socket.emit("online_users", { users: onlineUsers });
 
-    // Notify everyone else in the room
+    // Notify ALL other clients in the room (excluding the joining client) that a new user joined,
+    // including the refreshed online users list so they can update their UI.
     socket.to(fileId).emit("user_joined", { userId, userName, onlineUsers });
 
     console.log(`[chat] ${userName} (${userId}) joined room ${fileId}`);
