@@ -1,8 +1,7 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { registerChatHandlers } from "./chatHandlers";
-import { disconnectFromAllRooms } from "./roomManager";
-import { getOnlineUsers } from "./roomManager";
+import { disconnectFromAllRooms, getOnlineUsers } from "./roomManager";
 
 let io: SocketIOServer | null = null;
 
