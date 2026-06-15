@@ -59,4 +59,11 @@ router.delete(
   CollaborationController.revokeShareLink,
 );
 
+// Routes added by feature/backend-audit-log
+router.get("/pending", CollaborationController.getPendingInvitations);
+router.post("/accept/:invitationId", CollaborationController.acceptInvitation);
+router.post("/reject/:invitationId", CollaborationController.rejectInvitation);
+router.patch("/:fileId/role/:userId", CollaborationController.changeRole);
+router.delete("/:fileId/revoke/:userId", CollaborationController.revokeAccess);
+
 export default router;

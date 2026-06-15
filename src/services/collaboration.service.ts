@@ -24,6 +24,7 @@ import {
   updateFileShareRole,
   updateInvitationStatus,
 } from "../db/collaborationStore";
+import * as auditService from "./audit.service";
 
 interface InviteCollaboratorInput {
   fileId: string;
@@ -120,7 +121,7 @@ export function inviteCollaborator(
     throw new Error("A pending invitation already exists for this user.");
   }
 
-  return createInvitation({
+  const invitation = createInvitation({
     id: uuidv4(),
     fileId: file.id,
     inviterId,
@@ -130,6 +131,10 @@ export function inviteCollaborator(
     status: "pending",
     createdAt: new Date(),
   });
+
+  auditService.logAction(file.id, inviterId, "share", `Invited ${inviteeEmail} as ${role}`);
+
+  return invitation;
 }
 
 export function listMyInvitations(userId: string) {
@@ -195,6 +200,10 @@ export function respondToInvitation(
       });
   }
 
+  if (status === "accepted" && share) {
+    auditService.logAction(invitation.fileId, userId, "share", `Accepted invitation with role ${invitation.role}`);
+  }
+
   return {
     invitation: updatedInvitation,
     share,
@@ -221,7 +230,7 @@ export function shareFileWithUser(input: ShareFileInput): FileShare {
     throw new Error("This user already has access to the file.");
   }
 
-  return createFileShare({
+  const share = createFileShare({
     id: uuidv4(),
     fileId: file.id,
     ownerId,
@@ -230,6 +239,10 @@ export function shareFileWithUser(input: ShareFileInput): FileShare {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+
+  auditService.logAction(file.id, ownerId, "share", `Shared file with ${collaboratorEmail} as ${role}`);
+
+  return share;
 }
 
 export function listSharedUsers(fileId: string, ownerId: string) {
@@ -265,6 +278,8 @@ export function updateCollaboratorPermission(
     throw new Error("Collaborator not found.");
   }
 
+  auditService.logAction(fileId, ownerId, "permission_change", `Updated role for user ${collaboratorId} to ${validRole}`);
+
   return updatedShare;
 }
 
@@ -279,6 +294,8 @@ export function removeCollaborator(
   if (!removed) {
     throw new Error("Collaborator not found.");
   }
+
+  auditService.logAction(fileId, ownerId, "revoke_access", `Removed collaborator ${collaboratorId}`);
 }
 
 export function listFilesSharedWithMe(userId: string): SharedFileResult[] {
@@ -310,7 +327,7 @@ export function createFileShareLink(input: CreateShareLinkInput): ShareLink {
   const role = validateSharedRole(input.role);
   const file = requireFileOwner(fileId, ownerId);
 
-  return createShareLink({
+  const link = createShareLink({
     id: uuidv4(),
     fileId: file.id,
     ownerId,
@@ -320,6 +337,10 @@ export function createFileShareLink(input: CreateShareLinkInput): ShareLink {
     revokedAt: null,
     createdAt: new Date(),
   });
+
+  auditService.logAction(file.id, ownerId, "share", `Created share link with role ${role}`);
+
+  return link;
 }
 
 export function listFileShareLinks(fileId: string, ownerId: string): ShareLink[] {
@@ -337,6 +358,8 @@ export function revokeFileShareLink(token: string, ownerId: string): ShareLink {
 
   const revokedShareLink = revokeShareLink(token);
   if (!revokedShareLink) throw new Error("Share link not found.");
+
+  auditService.logAction(shareLink.fileId, ownerId, "permission_change", `Revoked share link`);
 
   return revokedShareLink;
 }
@@ -373,4 +396,35 @@ export function validateShareLinkToken(token: string) {
       url: file.publicUrl,
     },
   };
+}
+
+// ── New methods added by feature/backend-audit-log ───────────────────────────
+
+export function getPendingInvitations(userId: string) {
+  return listMyInvitations(userId).filter((inv) => inv.status === "pending");
+}
+
+export function acceptInvitation(userId: string, invitationId: string) {
+  return respondToInvitation(invitationId, userId, "accepted");
+}
+
+export function rejectInvitation(userId: string, invitationId: string) {
+  return respondToInvitation(invitationId, userId, "rejected");
+}
+
+export function changeRole(
+  ownerId: string,
+  fileId: string,
+  userId: string,
+  role: string,
+): FileShare {
+  return updateCollaboratorPermission(fileId, ownerId, userId, role);
+}
+
+export function revokeAccess(
+  ownerId: string,
+  fileId: string,
+  userId: string,
+): void {
+  return removeCollaborator(fileId, ownerId, userId);
 }

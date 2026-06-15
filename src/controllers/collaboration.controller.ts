@@ -271,4 +271,62 @@ export class CollaborationController {
       });
     }
   }
+
+  // ── Methods added by feature/backend-audit-log ────────────────────────────
+
+  static getPendingInvitations(req: Request, res: Response): void {
+    try {
+      const invitations = collaborationService.getPendingInvitations(req.user!.id);
+      res.status(200).json({ invitations });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  static acceptInvitation(req: Request, res: Response): void {
+    try {
+      const { invitationId } = req.params;
+      const result = collaborationService.acceptInvitation(req.user!.id, invitationId);
+      res.status(200).json({ message: "Invitation accepted.", ...result });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({ message: error.message });
+    }
+  }
+
+  static rejectInvitation(req: Request, res: Response): void {
+    try {
+      const { invitationId } = req.params;
+      const result = collaborationService.rejectInvitation(req.user!.id, invitationId);
+      res.status(200).json({ message: "Invitation rejected.", ...result });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({ message: error.message });
+    }
+  }
+
+  static changeRole(req: Request, res: Response): void {
+    try {
+      const { fileId, userId } = req.params;
+      const { role } = req.body;
+
+      if (!role) {
+        res.status(400).json({ message: "role is required." });
+        return;
+      }
+
+      const share = collaborationService.changeRole(req.user!.id, fileId, userId, role);
+      res.status(200).json({ message: "Role updated successfully.", share });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({ message: error.message });
+    }
+  }
+
+  static revokeAccess(req: Request, res: Response): void {
+    try {
+      const { fileId, userId } = req.params;
+      collaborationService.revokeAccess(req.user!.id, fileId, userId);
+      res.status(200).json({ message: "Access revoked successfully." });
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({ message: error.message });
+    }
+  }
 }
