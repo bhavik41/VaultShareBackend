@@ -9,6 +9,8 @@ import {
 // Typing state: fileId → Map<userId, { userName, timerId }>
 const typingState = new Map<string, Map<string, { userName: string; timerId: NodeJS.Timeout }>>();
 
+// If stop_typing is not received within this window, typing is auto-cleared
+// and a typing_indicator { isTyping: false } event is broadcast.
 const TYPING_EXPIRY_MS = 5000;
 
 // ── Online user management ─────────────────────────────────────────────────────
