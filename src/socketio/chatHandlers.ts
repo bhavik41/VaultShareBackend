@@ -21,12 +21,16 @@ function validateContent(content: unknown): content is string {
   );
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
   // ── join_room ────────────────────────────────────────────────────────────────
   socket.on("join_room", (payload: JoinRoomPayload) => {
-    const { fileId, userId, userName } = payload;
+    const { fileId, userId, userName } = payload ?? {};
 
-    if (!fileId || !userId || !userName) {
+    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId) || !isNonEmptyString(userName)) {
       socket.emit("error", { message: "join_room: fileId, userId and userName are required" });
       return;
     }
@@ -51,9 +55,9 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── leave_room ───────────────────────────────────────────────────────────────
   socket.on("leave_room", (payload: LeaveRoomPayload) => {
-    const { fileId, userId } = payload;
+    const { fileId, userId } = payload ?? {};
 
-    if (!fileId || !userId) {
+    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId)) {
       socket.emit("error", { message: "leave_room: fileId and userId are required" });
       return;
     }
@@ -70,9 +74,9 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── send_message ─────────────────────────────────────────────────────────────
   socket.on("send_message", (payload: SendMessagePayload) => {
-    const { fileId, userId, userName, content } = payload;
+    const { fileId, userId, userName, content } = payload ?? {};
 
-    if (!fileId || !userId || !userName) {
+    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId) || !isNonEmptyString(userName)) {
       socket.emit("error", { message: "send_message: fileId, userId and userName are required" });
       return;
     }
