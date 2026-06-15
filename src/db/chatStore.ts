@@ -1,6 +1,7 @@
 import { ChatMessage, OnlineUser } from "../types/chat.types";
 
-// Maximum number of messages retained per room (FIFO eviction)
+// Maximum number of messages retained per room (FIFO eviction).
+// Oldest messages are dropped when the cap is reached.
 export const MAX_MESSAGES_PER_ROOM = 100;
 
 // Map of fileId → array of ChatMessages (ordered oldest-first)
