@@ -78,7 +78,7 @@ export async function createViewLogDeduped(
   userId: string,
   windowMs = 5000,
 ): Promise<void> {
-  const key = ${fileId}:
+  const key = `${fileId}:${userId}`
   const last = viewDebounce.get(key) ?? 0
   if (Date.now() - last < windowMs) return
   viewDebounce.set(key, Date.now())
