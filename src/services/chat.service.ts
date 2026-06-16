@@ -9,21 +9,23 @@ import {
 /**
  * Persist a new chat message and return the saved record.
  */
-export function saveMessage(
+export async function saveMessage(
   fileId: string,
   userId: string,
   userName: string,
+  userEmail: string,
   content: string,
-): ChatMessage {
+): Promise<ChatMessage> {
   const message: ChatMessage = {
     id: uuidv4(),
     fileId,
     userId,
     userName,
+    userEmail,
     content,
     timestamp: new Date().toISOString(),
   };
-  addMessage(message);
+  await addMessage(message);
   return message;
 }
 
@@ -31,12 +33,12 @@ export function saveMessage(
  * Retrieve messages for a room, optionally filtered by `before` timestamp
  * and capped to `limit`.
  */
-export function getMessages(
+export async function getMessages(
   fileId: string,
   limit = 50,
   before?: string,
-): ChatMessage[] {
-  let messages = getRoomMessages(fileId);
+): Promise<ChatMessage[]> {
+  let messages = await getRoomMessages(fileId);
 
   if (before) {
     const beforeDate = new Date(before).getTime();
@@ -50,6 +52,6 @@ export function getMessages(
 /**
  * Clear all messages for a room (e.g., when a file is deleted).
  */
-export function clearRoom(fileId: string): void {
-  clearRoomMessages(fileId);
+export async function clearRoom(fileId: string): Promise<void> {
+  await clearRoomMessages(fileId);
 }

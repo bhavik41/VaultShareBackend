@@ -16,7 +16,7 @@ function getErrorStatus(message: string): number {
 }
 
 export class CollaborationController {
-  static inviteCollaborator(req: Request, res: Response): void {
+  static async inviteCollaborator(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
       const { inviteeEmail, role } = req.body;
@@ -28,7 +28,7 @@ export class CollaborationController {
         return;
       }
 
-      const invitation = collaborationService.inviteCollaborator({
+      const invitation = await collaborationService.inviteCollaborator({
         fileId,
         inviterId: req.user!.id,
         inviteeEmail,
@@ -46,19 +46,19 @@ export class CollaborationController {
     }
   }
 
-  static listMyInvitations(req: Request, res: Response): void {
+  static async listMyInvitations(req: Request, res: Response): Promise<void> {
     try {
-      const invitations = collaborationService.listMyInvitations(req.user!.id);
+      const invitations = await collaborationService.listMyInvitations(req.user!.id);
       res.status(200).json({ invitations });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  static listFileInvitations(req: Request, res: Response): void {
+  static async listFileInvitations(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
-      const invitations = collaborationService.listFileInvitations(
+      const invitations = await collaborationService.listFileInvitations(
         fileId,
         req.user!.id,
       );
@@ -71,12 +71,12 @@ export class CollaborationController {
     }
   }
 
-  static respondToInvitation(req: Request, res: Response): void {
+  static async respondToInvitation(req: Request, res: Response): Promise<void> {
     try {
       const { invitationId } = req.params;
       const { status } = req.body;
 
-      const result = collaborationService.respondToInvitation(
+      const result = await collaborationService.respondToInvitation(
         invitationId,
         req.user!.id,
         status,
@@ -93,7 +93,7 @@ export class CollaborationController {
     }
   }
 
-  static shareFileWithUser(req: Request, res: Response): void {
+  static async shareFileWithUser(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
       const { collaboratorEmail, role } = req.body;
@@ -105,7 +105,7 @@ export class CollaborationController {
         return;
       }
 
-      const share = collaborationService.shareFileWithUser({
+      const share = await collaborationService.shareFileWithUser({
         fileId,
         ownerId: req.user!.id,
         collaboratorEmail,
@@ -123,10 +123,10 @@ export class CollaborationController {
     }
   }
 
-  static listSharedUsers(req: Request, res: Response): void {
+  static async listSharedUsers(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
-      const collaborators = collaborationService.listSharedUsers(
+      const collaborators = await collaborationService.listSharedUsers(
         fileId,
         req.user!.id,
       );
@@ -139,7 +139,7 @@ export class CollaborationController {
     }
   }
 
-  static updateCollaboratorPermission(req: Request, res: Response): void {
+  static async updateCollaboratorPermission(req: Request, res: Response): Promise<void> {
     try {
       const { fileId, userId } = req.params;
       const { role } = req.body;
@@ -149,7 +149,7 @@ export class CollaborationController {
         return;
       }
 
-      const share = collaborationService.updateCollaboratorPermission(
+      const share = await collaborationService.updateCollaboratorPermission(
         fileId,
         req.user!.id,
         userId,
@@ -167,11 +167,11 @@ export class CollaborationController {
     }
   }
 
-  static removeCollaborator(req: Request, res: Response): void {
+  static async removeCollaborator(req: Request, res: Response): Promise<void> {
     try {
       const { fileId, userId } = req.params;
 
-      collaborationService.removeCollaborator(fileId, req.user!.id, userId);
+      await collaborationService.removeCollaborator(fileId, req.user!.id, userId);
 
       res.status(200).json({
         message: "Collaborator removed successfully.",
@@ -183,16 +183,16 @@ export class CollaborationController {
     }
   }
 
-  static listFilesSharedWithMe(req: Request, res: Response): void {
+  static async listFilesSharedWithMe(req: Request, res: Response): Promise<void> {
     try {
-      const files = collaborationService.listFilesSharedWithMe(req.user!.id);
+      const files = await collaborationService.listFilesSharedWithMe(req.user!.id);
       res.status(200).json({ files });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  static createShareLink(req: Request, res: Response): void {
+  static async createShareLink(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
       const { role, expiresAt } = req.body;
@@ -202,7 +202,7 @@ export class CollaborationController {
         return;
       }
 
-      const shareLink = collaborationService.createFileShareLink({
+      const shareLink = await collaborationService.createFileShareLink({
         fileId,
         ownerId: req.user!.id,
         role,
@@ -220,11 +220,11 @@ export class CollaborationController {
     }
   }
 
-  static listShareLinks(req: Request, res: Response): void {
+  static async listShareLinks(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
 
-      const shareLinks = collaborationService.listFileShareLinks(
+      const shareLinks = await collaborationService.listFileShareLinks(
         fileId,
         req.user!.id,
       );
@@ -237,10 +237,10 @@ export class CollaborationController {
     }
   }
 
-  static revokeShareLink(req: Request, res: Response): void {
+  static async revokeShareLink(req: Request, res: Response): Promise<void> {
     try {
       const { token } = req.params;
-      const shareLink = collaborationService.revokeFileShareLink(
+      const shareLink = await collaborationService.revokeFileShareLink(
         token,
         req.user!.id,
       );
@@ -256,10 +256,10 @@ export class CollaborationController {
     }
   }
 
-  static validateShareLink(req: Request, res: Response): void {
+  static async validateShareLink(req: Request, res: Response): Promise<void> {
     try {
       const { token } = req.params;
-      const result = collaborationService.validateShareLinkToken(token);
+      const result = await collaborationService.validateShareLinkToken(token);
 
       res.status(200).json({
         message: "Share link is valid.",
@@ -274,36 +274,36 @@ export class CollaborationController {
 
   // ── Methods added by feature/backend-audit-log ────────────────────────────
 
-  static getPendingInvitations(req: Request, res: Response): void {
+  static async getPendingInvitations(req: Request, res: Response): Promise<void> {
     try {
-      const invitations = collaborationService.getPendingInvitations(req.user!.id);
+      const invitations = await collaborationService.getPendingInvitations(req.user!.id);
       res.status(200).json({ invitations });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  static acceptInvitation(req: Request, res: Response): void {
+  static async acceptInvitation(req: Request, res: Response): Promise<void> {
     try {
       const { invitationId } = req.params;
-      const result = collaborationService.acceptInvitation(req.user!.id, invitationId);
+      const result = await collaborationService.acceptInvitation(req.user!.id, invitationId);
       res.status(200).json({ message: "Invitation accepted.", ...result });
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message });
     }
   }
 
-  static rejectInvitation(req: Request, res: Response): void {
+  static async rejectInvitation(req: Request, res: Response): Promise<void> {
     try {
       const { invitationId } = req.params;
-      const result = collaborationService.rejectInvitation(req.user!.id, invitationId);
+      const result = await collaborationService.rejectInvitation(req.user!.id, invitationId);
       res.status(200).json({ message: "Invitation rejected.", ...result });
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message });
     }
   }
 
-  static changeRole(req: Request, res: Response): void {
+  static async changeRole(req: Request, res: Response): Promise<void> {
     try {
       const { fileId, userId } = req.params;
       const { role } = req.body;
@@ -313,17 +313,17 @@ export class CollaborationController {
         return;
       }
 
-      const share = collaborationService.changeRole(req.user!.id, fileId, userId, role);
+      const share = await collaborationService.changeRole(req.user!.id, fileId, userId, role);
       res.status(200).json({ message: "Role updated successfully.", share });
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message });
     }
   }
 
-  static revokeAccess(req: Request, res: Response): void {
+  static async revokeAccess(req: Request, res: Response): Promise<void> {
     try {
       const { fileId, userId } = req.params;
-      collaborationService.revokeAccess(req.user!.id, fileId, userId);
+      await collaborationService.revokeAccess(req.user!.id, fileId, userId);
       res.status(200).json({ message: "Access revoked successfully." });
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message });

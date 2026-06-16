@@ -42,8 +42,8 @@ function generateOtp(): string {
   return crypto.randomInt(100000, 999999).toString();
 }
 
-export function getMe(userId: string) {
-  const user = findUserById(userId);
+export async function getMe(userId: string) {
+  const user = await findUserById(userId);
   if (!user) throw new Error("User not found.");
   return {
     id: user.id,
@@ -62,11 +62,11 @@ export async function signup(data: SignupBody) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) throw new Error("Invalid email address.");
 
-  if (findUserByEmail(email))
+  if (await findUserByEmail(email))
     throw new Error("An account with this email already exists.");
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const newUser = createUser({
+  const newUser = await createUser({
     id: uuidv4(),
     name: name.trim(),
     email: email.toLowerCase().trim(),
@@ -88,14 +88,14 @@ export async function signup(data: SignupBody) {
 
   const accessToken = issueAccessToken(userPayload);
   const refreshToken = issueRefreshToken(userPayload);
-  updateUser(newUser.id, { refreshToken });
+  await updateUser(newUser.id, { refreshToken });
 
   return { user: newUser, accessToken, refreshToken };
 }
 
 export async function signin(data: SigninBody) {
   const { email, password } = data;
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new Error("Invalid email or password.");
   }
@@ -113,12 +113,12 @@ export async function signin(data: SigninBody) {
   };
   const accessToken = issueAccessToken(userPayload);
   const refreshToken = issueRefreshToken(userPayload);
-  updateUser(user.id, { refreshToken });
+  await updateUser(user.id, { refreshToken });
 
   return { requires2fa: false, user, accessToken, refreshToken };
 }
 
-export function refresh(refreshToken: string) {
+export async function refresh(refreshToken: string) {
   let decoded: UserPayload;
   try {
     decoded = jwt.verify(refreshToken, REFRESH_SECRET()) as UserPayload;
@@ -126,7 +126,7 @@ export function refresh(refreshToken: string) {
     throw new Error("Invalid or expired refresh token.");
   }
 
-  const user = findUserByRefreshToken(refreshToken);
+  const user = await findUserByRefreshToken(refreshToken);
   if (!user || user.id !== decoded.id) {
     throw new Error("Refresh token revoked or not found.");
   }
@@ -139,22 +139,22 @@ export function refresh(refreshToken: string) {
   };
   const newAccessToken = issueAccessToken(userPayload);
   const newRefreshToken = issueRefreshToken(userPayload);
-  updateUser(user.id, { refreshToken: newRefreshToken });
+  await updateUser(user.id, { refreshToken: newRefreshToken });
 
   return { newAccessToken, newRefreshToken };
 }
 
-export function logout(userId: string) {
-  updateUser(userId, { refreshToken: null });
+export async function logout(userId: string) {
+  await updateUser(userId, { refreshToken: null });
 }
 
 export async function forgotPassword(email: string) {
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
   if (!user) return { otp: null }; // Return generic success later to avoid enum
 
   const otp = generateOtp();
   const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-  updateUser(user.id, { resetOtp: otp, resetOtpExpiry: expiry });
+  await updateUser(user.id, { resetOtp: otp, resetOtpExpiry: expiry });
 
   await sendPasswordResetEmail(user.email, otp);
   return { otp };
@@ -165,14 +165,14 @@ export async function resetPassword(data: ResetPasswordBody) {
   if (newPassword.length < 6)
     throw new Error("Password must be at least 6 characters.");
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
   if (!user || !user.resetOtp || !user.resetOtpExpiry)
     throw new Error("Invalid or expired OTP.");
   if (user.resetOtp !== otp || user.resetOtpExpiry < new Date())
     throw new Error("Invalid or expired OTP.");
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  updateUser(user.id, {
+  await updateUser(user.id, {
     passwordHash,
     resetOtp: null,
     resetOtpExpiry: null,
@@ -181,7 +181,7 @@ export async function resetPassword(data: ResetPasswordBody) {
 }
 
 export async function setup2fa(userId: string) {
-  const user = findUserById(userId);
+  const user = await findUserById(userId);
   if (!user) throw new Error("User not found.");
   if (user.twoFactorEnabled) throw new Error("2FA is already enabled.");
 
@@ -190,15 +190,15 @@ export async function setup2fa(userId: string) {
     length: 20,
   });
 
-  updateUser(user.id, { twoFactorSecret: secret.base32 });
+  await updateUser(user.id, { twoFactorSecret: secret.base32 });
   const otpauthUrl = secret.otpauth_url ?? "";
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
   return { qrCode: qrCodeDataUrl, secret: secret.base32, otpauthUrl };
 }
 
-export function verify2fa(userId: string, token: string) {
-  const user = findUserById(userId);
+export async function verify2fa(userId: string, token: string) {
+  const user = await findUserById(userId);
   if (!user || !user.twoFactorSecret) throw new Error("Run /2fa/setup first.");
 
   const valid = speakeasy.totp.verify({
@@ -209,10 +209,10 @@ export function verify2fa(userId: string, token: string) {
   });
 
   if (!valid) throw new Error("Invalid TOTP code. Try again.");
-  updateUser(user.id, { twoFactorEnabled: true });
+  await updateUser(user.id, { twoFactorEnabled: true });
 }
 
-export function validate2fa(tempToken: string, token: string) {
+export async function validate2fa(tempToken: string, token: string) {
   let decoded: TempTokenPayload;
   try {
     decoded = jwt.verify(tempToken, TEMP_SECRET()) as TempTokenPayload;
@@ -220,7 +220,7 @@ export function validate2fa(tempToken: string, token: string) {
     throw new Error("Temp token invalid or expired.");
   }
 
-  const user = findUserById(decoded.id);
+  const user = await findUserById(decoded.id);
   if (!user || !user.twoFactorSecret || !user.twoFactorEnabled) {
     throw new Error("2FA not set up for this account.");
   }
@@ -242,13 +242,13 @@ export function validate2fa(tempToken: string, token: string) {
   };
   const accessToken = issueAccessToken(userPayload);
   const refreshToken = issueRefreshToken(userPayload);
-  updateUser(user.id, { refreshToken });
+  await updateUser(user.id, { refreshToken });
 
   return { user, accessToken, refreshToken };
 }
 
-export function disable2fa(userId: string, token: string) {
-  const user = findUserById(userId);
+export async function disable2fa(userId: string, token: string) {
+  const user = await findUserById(userId);
   if (!user || !user.twoFactorEnabled) throw new Error("2FA is not enabled.");
 
   const valid = speakeasy.totp.verify({
@@ -259,5 +259,5 @@ export function disable2fa(userId: string, token: string) {
   });
 
   if (!valid) throw new Error("Invalid TOTP code. Cannot disable 2FA.");
-  updateUser(user.id, { twoFactorEnabled: false, twoFactorSecret: null });
+  await updateUser(user.id, { twoFactorEnabled: false, twoFactorSecret: null });
 }

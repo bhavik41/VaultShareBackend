@@ -1,3 +1,15 @@
+/**
+ * Collaboration store backed by MongoDB (invitations, file shares, share links).
+ */
+import {
+  InvitationModel,
+  FileShareModel,
+  ShareLinkModel,
+  IInvitation,
+  IFileShare,
+  IShareLink,
+} from "../models/Collaboration";
+
 export type InvitationStatus = "pending" | "accepted" | "rejected";
 export type CollaboratorRole = "owner" | "editor" | "viewer";
 export type SharedRole = Exclude<CollaboratorRole, "owner">;
@@ -35,146 +47,196 @@ export interface ShareLink {
   createdAt: Date;
 }
 
-const invitations = new Map<string, CollaborationInvitation>();
-const fileShares = new Map<string, FileShare>();
-const shareLinks = new Map<string, ShareLink>();
+// ── Mappers ──────────────────────────────────────────────────────────────────
 
-export const createInvitation = (
+function toInvitation(doc: IInvitation): CollaborationInvitation {
+  return {
+    id: doc._id,
+    fileId: doc.fileId,
+    inviterId: doc.inviterId,
+    inviteeId: doc.inviteeId,
+    inviteeEmail: doc.inviteeEmail,
+    role: doc.role,
+    status: doc.status,
+    createdAt: doc.createdAt,
+    respondedAt: doc.respondedAt,
+  };
+}
+
+function toFileShare(doc: IFileShare): FileShare {
+  return {
+    id: doc._id,
+    fileId: doc.fileId,
+    ownerId: doc.ownerId,
+    userId: doc.userId,
+    role: doc.role,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+}
+
+function toShareLink(doc: IShareLink): ShareLink {
+  return {
+    id: doc._id,
+    fileId: doc.fileId,
+    ownerId: doc.ownerId,
+    token: doc.token,
+    role: doc.role,
+    expiresAt: doc.expiresAt,
+    revokedAt: doc.revokedAt,
+    createdAt: doc.createdAt,
+  };
+}
+
+// ── Invitations ────────────────────────────────────────────────────────────────
+
+export const createInvitation = async (
   invitation: CollaborationInvitation,
-): CollaborationInvitation => {
-  invitations.set(invitation.id, invitation);
-  return invitation;
+): Promise<CollaborationInvitation> => {
+  const doc = await InvitationModel.create({
+    _id: invitation.id,
+    fileId: invitation.fileId,
+    inviterId: invitation.inviterId,
+    inviteeId: invitation.inviteeId,
+    inviteeEmail: invitation.inviteeEmail,
+    role: invitation.role,
+    status: invitation.status,
+    createdAt: invitation.createdAt,
+    respondedAt: invitation.respondedAt,
+  });
+  return toInvitation(doc.toObject());
 };
 
-export const getInvitationById = (
+export const getInvitationById = async (
   id: string,
-): CollaborationInvitation | undefined => {
-  return invitations.get(id);
+): Promise<CollaborationInvitation | undefined> => {
+  const doc = await InvitationModel.findById(id).lean();
+  return doc ? toInvitation(doc) : undefined;
 };
 
-export const getInvitationsForUser = (
+export const getInvitationsForUser = async (
   userId: string,
-): CollaborationInvitation[] => {
-  return Array.from(invitations.values()).filter(
-    (invitation) => invitation.inviteeId === userId,
-  );
+): Promise<CollaborationInvitation[]> => {
+  const docs = await InvitationModel.find({ inviteeId: userId }).lean();
+  return docs.map(toInvitation);
 };
 
-export const getInvitationsByFile = (
+export const getInvitationsByFile = async (
   fileId: string,
-): CollaborationInvitation[] => {
-  return Array.from(invitations.values()).filter(
-    (invitation) => invitation.fileId === fileId,
-  );
+): Promise<CollaborationInvitation[]> => {
+  const docs = await InvitationModel.find({ fileId }).lean();
+  return docs.map(toInvitation);
 };
 
-export const findPendingInvitation = (
+export const findPendingInvitation = async (
   fileId: string,
   inviteeId: string,
-): CollaborationInvitation | undefined => {
-  return Array.from(invitations.values()).find(
-    (invitation) =>
-      invitation.fileId === fileId &&
-      invitation.inviteeId === inviteeId &&
-      invitation.status === "pending",
-  );
+): Promise<CollaborationInvitation | undefined> => {
+  const doc = await InvitationModel.findOne({ fileId, inviteeId, status: "pending" }).lean();
+  return doc ? toInvitation(doc) : undefined;
 };
 
-export const updateInvitationStatus = (
+export const updateInvitationStatus = async (
   id: string,
   status: InvitationStatus,
-): CollaborationInvitation | undefined => {
-  const invitation = invitations.get(id);
-  if (!invitation) return undefined;
-
-  const updatedInvitation: CollaborationInvitation = {
-    ...invitation,
-    status,
-    respondedAt: new Date(),
-  };
-
-  invitations.set(id, updatedInvitation);
-  return updatedInvitation;
+): Promise<CollaborationInvitation | undefined> => {
+  const doc = await InvitationModel.findByIdAndUpdate(
+    id,
+    { status, respondedAt: new Date() },
+    { new: true },
+  ).lean();
+  return doc ? toInvitation(doc) : undefined;
 };
 
-export const createFileShare = (share: FileShare): FileShare => {
-  fileShares.set(share.id, share);
-  return share;
+// ── File shares ────────────────────────────────────────────────────────────────
+
+export const createFileShare = async (share: FileShare): Promise<FileShare> => {
+  const doc = await FileShareModel.create({
+    _id: share.id,
+    fileId: share.fileId,
+    ownerId: share.ownerId,
+    userId: share.userId,
+    role: share.role,
+    createdAt: share.createdAt,
+    updatedAt: share.updatedAt,
+  });
+  return toFileShare(doc.toObject());
 };
 
-export const getFileShare = (
+export const getFileShare = async (
   fileId: string,
   userId: string,
-): FileShare | undefined => {
-  return Array.from(fileShares.values()).find(
-    (share) => share.fileId === fileId && share.userId === userId,
-  );
+): Promise<FileShare | undefined> => {
+  const doc = await FileShareModel.findOne({ fileId, userId }).lean();
+  return doc ? toFileShare(doc) : undefined;
 };
 
-export const getSharesByFile = (fileId: string): FileShare[] => {
-  return Array.from(fileShares.values()).filter(
-    (share) => share.fileId === fileId,
-  );
+export const getSharesByFile = async (fileId: string): Promise<FileShare[]> => {
+  const docs = await FileShareModel.find({ fileId }).lean();
+  return docs.map(toFileShare);
 };
 
-export const getSharesByUser = (userId: string): FileShare[] => {
-  return Array.from(fileShares.values()).filter(
-    (share) => share.userId === userId,
-  );
+export const getSharesByUser = async (userId: string): Promise<FileShare[]> => {
+  const docs = await FileShareModel.find({ userId }).lean();
+  return docs.map(toFileShare);
 };
 
-export const updateFileShareRole = (
+export const updateFileShareRole = async (
   fileId: string,
   userId: string,
   role: SharedRole,
-): FileShare | undefined => {
-  const share = getFileShare(fileId, userId);
-  if (!share) return undefined;
-
-  const updatedShare: FileShare = {
-    ...share,
-    role,
-    updatedAt: new Date(),
-  };
-
-  fileShares.set(share.id, updatedShare);
-  return updatedShare;
+): Promise<FileShare | undefined> => {
+  const doc = await FileShareModel.findOneAndUpdate(
+    { fileId, userId },
+    { role, updatedAt: new Date() },
+    { new: true },
+  ).lean();
+  return doc ? toFileShare(doc) : undefined;
 };
 
-export const removeFileShare = (fileId: string, userId: string): boolean => {
-  const share = getFileShare(fileId, userId);
-  if (!share) return false;
-
-  fileShares.delete(share.id);
-  return true;
+export const removeFileShare = async (
+  fileId: string,
+  userId: string,
+): Promise<boolean> => {
+  const res = await FileShareModel.deleteOne({ fileId, userId });
+  return res.deletedCount > 0;
 };
 
-export const createShareLink = (shareLink: ShareLink): ShareLink => {
-  shareLinks.set(shareLink.id, shareLink);
-  return shareLink;
+// ── Share links ────────────────────────────────────────────────────────────────
+
+export const createShareLink = async (shareLink: ShareLink): Promise<ShareLink> => {
+  const doc = await ShareLinkModel.create({
+    _id: shareLink.id,
+    fileId: shareLink.fileId,
+    ownerId: shareLink.ownerId,
+    token: shareLink.token,
+    role: shareLink.role,
+    expiresAt: shareLink.expiresAt,
+    revokedAt: shareLink.revokedAt,
+    createdAt: shareLink.createdAt,
+  });
+  return toShareLink(doc.toObject());
 };
 
-export const getShareLinkByToken = (token: string): ShareLink | undefined => {
-  return Array.from(shareLinks.values()).find(
-    (shareLink) => shareLink.token === token,
-  );
+export const getShareLinkByToken = async (
+  token: string,
+): Promise<ShareLink | undefined> => {
+  const doc = await ShareLinkModel.findOne({ token }).lean();
+  return doc ? toShareLink(doc) : undefined;
 };
 
-export const getShareLinksByFile = (fileId: string): ShareLink[] => {
-  return Array.from(shareLinks.values()).filter(
-    (shareLink) => shareLink.fileId === fileId,
-  );
+export const getShareLinksByFile = async (fileId: string): Promise<ShareLink[]> => {
+  const docs = await ShareLinkModel.find({ fileId }).lean();
+  return docs.map(toShareLink);
 };
 
-export const revokeShareLink = (token: string): ShareLink | undefined => {
-  const shareLink = getShareLinkByToken(token);
-  if (!shareLink) return undefined;
-
-  const revokedShareLink: ShareLink = {
-    ...shareLink,
-    revokedAt: new Date(),
-  };
-
-  shareLinks.set(shareLink.id, revokedShareLink);
-  return revokedShareLink;
+export const revokeShareLink = async (
+  token: string,
+): Promise<ShareLink | undefined> => {
+  const doc = await ShareLinkModel.findOneAndUpdate(
+    { token },
+    { revokedAt: new Date() },
+    { new: true },
+  ).lean();
+  return doc ? toShareLink(doc) : undefined;
 };

@@ -65,8 +65,8 @@ export function validateSharedRole(role: string): SharedRole {
   throw new Error("Role must be either editor or viewer.");
 }
 
-function requireFileOwner(fileId: string, userId: string) {
-  const file = getFileById(fileId);
+async function requireFileOwner(fileId: string, userId: string) {
+  const file = await getFileById(fileId);
   if (!file) throw new Error("File not found.");
   if (file.userId !== userId) throw new Error("Access denied.");
   return file;
@@ -94,14 +94,14 @@ function parseExpirationDate(expiresAt?: string): Date {
   return expirationDate;
 }
 
-export function inviteCollaborator(
+export async function inviteCollaborator(
   input: InviteCollaboratorInput,
-): CollaborationInvitation {
+): Promise<CollaborationInvitation> {
   const { fileId, inviterId, inviteeEmail } = input;
   const role = validateSharedRole(input.role);
 
-  const file = requireFileOwner(fileId, inviterId);
-  const invitee = findUserByEmail(inviteeEmail);
+  const file = await requireFileOwner(fileId, inviterId);
+  const invitee = await findUserByEmail(inviteeEmail);
 
   if (!invitee) {
     throw new Error("Invited user must have a registered account.");
@@ -111,17 +111,17 @@ export function inviteCollaborator(
     throw new Error("You cannot invite yourself to your own file.");
   }
 
-  const existingShare = getFileShare(file.id, invitee.id);
+  const existingShare = await getFileShare(file.id, invitee.id);
   if (existingShare) {
     throw new Error("This user already has access to the file.");
   }
 
-  const pendingInvitation = findPendingInvitation(file.id, invitee.id);
+  const pendingInvitation = await findPendingInvitation(file.id, invitee.id);
   if (pendingInvitation) {
     throw new Error("A pending invitation already exists for this user.");
   }
 
-  const invitation = createInvitation({
+  const invitation = await createInvitation({
     id: uuidv4(),
     fileId: file.id,
     inviterId,
@@ -137,26 +137,29 @@ export function inviteCollaborator(
   return invitation;
 }
 
-export function listMyInvitations(userId: string) {
-  return getInvitationsForUser(userId).map((invitation) => {
-    const file = getFileById(invitation.fileId);
-    const inviter = findUserById(invitation.inviterId);
+export async function listMyInvitations(userId: string) {
+  const invitations = await getInvitationsForUser(userId);
+  return Promise.all(
+    invitations.map(async (invitation) => {
+      const file = await getFileById(invitation.fileId);
+      const inviter = await findUserById(invitation.inviterId);
 
-    return {
-      ...invitation,
-      fileName: file?.originalName ?? "Unknown file",
-      inviterName: inviter?.name ?? "Unknown user",
-      inviterEmail: inviter?.email ?? "",
-    };
-  });
+      return {
+        ...invitation,
+        fileName: file?.originalName ?? "Unknown file",
+        inviterName: inviter?.name ?? "Unknown user",
+        inviterEmail: inviter?.email ?? "",
+      };
+    }),
+  );
 }
 
-export function listFileInvitations(fileId: string, ownerId: string) {
-  requireFileOwner(fileId, ownerId);
+export async function listFileInvitations(fileId: string, ownerId: string) {
+  await requireFileOwner(fileId, ownerId);
   return getInvitationsByFile(fileId);
 }
 
-export function respondToInvitation(
+export async function respondToInvitation(
   invitationId: string,
   userId: string,
   status: string,
@@ -165,7 +168,7 @@ export function respondToInvitation(
     throw new Error("Status must be accepted or rejected.");
   }
 
-  const invitation = getInvitationById(invitationId);
+  const invitation = await getInvitationById(invitationId);
   if (!invitation) throw new Error("Invitation not found.");
 
   if (invitation.inviteeId !== userId) {
@@ -176,20 +179,20 @@ export function respondToInvitation(
     throw new Error("Invitation has already been responded to.");
   }
 
-  const updatedInvitation = updateInvitationStatus(invitationId, status);
+  const updatedInvitation = await updateInvitationStatus(invitationId, status);
   if (!updatedInvitation) throw new Error("Invitation not found.");
 
   let share = null;
 
   if (status === "accepted") {
-    const file = getFileById(invitation.fileId);
+    const file = await getFileById(invitation.fileId);
     if (!file) throw new Error("File not found.");
 
-    const existingShare = getFileShare(invitation.fileId, userId);
+    const existingShare = await getFileShare(invitation.fileId, userId);
 
     share =
       existingShare ??
-      createFileShare({
+      (await createFileShare({
         id: uuidv4(),
         fileId: invitation.fileId,
         ownerId: file.userId,
@@ -197,7 +200,7 @@ export function respondToInvitation(
         role: invitation.role,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      }));
   }
 
   if (status === "accepted" && share) {
@@ -210,12 +213,12 @@ export function respondToInvitation(
   };
 }
 
-export function shareFileWithUser(input: ShareFileInput): FileShare {
+export async function shareFileWithUser(input: ShareFileInput): Promise<FileShare> {
   const { fileId, ownerId, collaboratorEmail } = input;
   const role = validateSharedRole(input.role);
 
-  const file = requireFileOwner(fileId, ownerId);
-  const collaborator = findUserByEmail(collaboratorEmail);
+  const file = await requireFileOwner(fileId, ownerId);
+  const collaborator = await findUserByEmail(collaboratorEmail);
 
   if (!collaborator) {
     throw new Error("Collaborator must have a registered account.");
@@ -225,12 +228,12 @@ export function shareFileWithUser(input: ShareFileInput): FileShare {
     throw new Error("You cannot share a file with yourself.");
   }
 
-  const existingShare = getFileShare(file.id, collaborator.id);
+  const existingShare = await getFileShare(file.id, collaborator.id);
   if (existingShare) {
     throw new Error("This user already has access to the file.");
   }
 
-  const share = createFileShare({
+  const share = await createFileShare({
     id: uuidv4(),
     fileId: file.id,
     ownerId,
@@ -245,35 +248,38 @@ export function shareFileWithUser(input: ShareFileInput): FileShare {
   return share;
 }
 
-export function listSharedUsers(fileId: string, ownerId: string) {
-  const file = requireFileOwner(fileId, ownerId);
+export async function listSharedUsers(fileId: string, ownerId: string) {
+  const file = await requireFileOwner(fileId, ownerId);
 
-  return getSharesByFile(file.id).map((share) => {
-    const user = findUserById(share.userId);
+  const shares = await getSharesByFile(file.id);
+  return Promise.all(
+    shares.map(async (share) => {
+      const user = await findUserById(share.userId);
 
-    return {
-      id: share.id,
-      fileId: share.fileId,
-      userId: share.userId,
-      name: user?.name ?? "Unknown user",
-      email: user?.email ?? "",
-      role: share.role,
-      createdAt: share.createdAt,
-      updatedAt: share.updatedAt,
-    };
-  });
+      return {
+        id: share.id,
+        fileId: share.fileId,
+        userId: share.userId,
+        name: user?.name ?? "Unknown user",
+        email: user?.email ?? "",
+        role: share.role,
+        createdAt: share.createdAt,
+        updatedAt: share.updatedAt,
+      };
+    }),
+  );
 }
 
-export function updateCollaboratorPermission(
+export async function updateCollaboratorPermission(
   fileId: string,
   ownerId: string,
   collaboratorId: string,
   role: string,
-): FileShare {
+): Promise<FileShare> {
   const validRole = validateSharedRole(role);
-  requireFileOwner(fileId, ownerId);
+  await requireFileOwner(fileId, ownerId);
 
-  const updatedShare = updateFileShareRole(fileId, collaboratorId, validRole);
+  const updatedShare = await updateFileShareRole(fileId, collaboratorId, validRole);
   if (!updatedShare) {
     throw new Error("Collaborator not found.");
   }
@@ -283,14 +289,14 @@ export function updateCollaboratorPermission(
   return updatedShare;
 }
 
-export function removeCollaborator(
+export async function removeCollaborator(
   fileId: string,
   ownerId: string,
   collaboratorId: string,
-): void {
-  requireFileOwner(fileId, ownerId);
+): Promise<void> {
+  await requireFileOwner(fileId, ownerId);
 
-  const removed = removeFileShare(fileId, collaboratorId);
+  const removed = await removeFileShare(fileId, collaboratorId);
   if (!removed) {
     throw new Error("Collaborator not found.");
   }
@@ -298,13 +304,14 @@ export function removeCollaborator(
   auditService.logAction(fileId, ownerId, "revoke_access", `Removed collaborator ${collaboratorId}`);
 }
 
-export function listFilesSharedWithMe(userId: string): SharedFileResult[] {
-  return getSharesByUser(userId)
-    .map((share) => {
-      const file = getFileById(share.fileId);
+export async function listFilesSharedWithMe(userId: string): Promise<SharedFileResult[]> {
+  const shares = await getSharesByUser(userId);
+  const resolved = await Promise.all(
+    shares.map(async (share) => {
+      const file = await getFileById(share.fileId);
       if (!file) return null;
 
-      const owner = findUserById(share.ownerId);
+      const owner = await findUserById(share.ownerId);
 
       return {
         id: file.id,
@@ -318,16 +325,17 @@ export function listFilesSharedWithMe(userId: string): SharedFileResult[] {
         createdAt: file.createdAt,
         sharedAt: share.createdAt,
       };
-    })
-    .filter((file): file is SharedFileResult => file !== null);
+    }),
+  );
+  return resolved.filter((file): file is SharedFileResult => file !== null);
 }
 
-export function createFileShareLink(input: CreateShareLinkInput): ShareLink {
+export async function createFileShareLink(input: CreateShareLinkInput): Promise<ShareLink> {
   const { fileId, ownerId } = input;
   const role = validateSharedRole(input.role);
-  const file = requireFileOwner(fileId, ownerId);
+  const file = await requireFileOwner(fileId, ownerId);
 
-  const link = createShareLink({
+  const link = await createShareLink({
     id: uuidv4(),
     fileId: file.id,
     ownerId,
@@ -343,20 +351,20 @@ export function createFileShareLink(input: CreateShareLinkInput): ShareLink {
   return link;
 }
 
-export function listFileShareLinks(fileId: string, ownerId: string): ShareLink[] {
-  const file = requireFileOwner(fileId, ownerId);
+export async function listFileShareLinks(fileId: string, ownerId: string): Promise<ShareLink[]> {
+  const file = await requireFileOwner(fileId, ownerId);
   return getShareLinksByFile(file.id);
 }
 
-export function revokeFileShareLink(token: string, ownerId: string): ShareLink {
-  const shareLink = getShareLinkByToken(token);
+export async function revokeFileShareLink(token: string, ownerId: string): Promise<ShareLink> {
+  const shareLink = await getShareLinkByToken(token);
   if (!shareLink) throw new Error("Share link not found.");
 
   if (shareLink.ownerId !== ownerId) {
     throw new Error("Access denied.");
   }
 
-  const revokedShareLink = revokeShareLink(token);
+  const revokedShareLink = await revokeShareLink(token);
   if (!revokedShareLink) throw new Error("Share link not found.");
 
   auditService.logAction(shareLink.fileId, ownerId, "permission_change", `Revoked share link`);
@@ -364,8 +372,8 @@ export function revokeFileShareLink(token: string, ownerId: string): ShareLink {
   return revokedShareLink;
 }
 
-export function validateShareLinkToken(token: string) {
-  const shareLink = getShareLinkByToken(token);
+export async function validateShareLinkToken(token: string) {
+  const shareLink = await getShareLinkByToken(token);
   if (!shareLink) throw new Error("Share link not found.");
 
   if (shareLink.revokedAt) {
@@ -376,10 +384,10 @@ export function validateShareLinkToken(token: string) {
     throw new Error("Share link has expired.");
   }
 
-  const file = getFileById(shareLink.fileId);
+  const file = await getFileById(shareLink.fileId);
   if (!file) throw new Error("File not found.");
 
-  const owner = findUserById(shareLink.ownerId);
+  const owner = await findUserById(shareLink.ownerId);
 
   return {
     shareLink,
@@ -400,8 +408,9 @@ export function validateShareLinkToken(token: string) {
 
 // ── New methods added by feature/backend-audit-log ───────────────────────────
 
-export function getPendingInvitations(userId: string) {
-  return listMyInvitations(userId).filter((inv) => inv.status === "pending");
+export async function getPendingInvitations(userId: string) {
+  const invitations = await listMyInvitations(userId);
+  return invitations.filter((inv) => inv.status === "pending");
 }
 
 export function acceptInvitation(userId: string, invitationId: string) {
@@ -417,7 +426,7 @@ export function changeRole(
   fileId: string,
   userId: string,
   role: string,
-): FileShare {
+): Promise<FileShare> {
   return updateCollaboratorPermission(fileId, ownerId, userId, role);
 }
 
@@ -425,6 +434,6 @@ export function revokeAccess(
   ownerId: string,
   fileId: string,
   userId: string,
-): void {
+): Promise<void> {
   return removeCollaborator(fileId, ownerId, userId);
 }

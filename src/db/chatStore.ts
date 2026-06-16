@@ -1,33 +1,45 @@
 import { ChatMessage, OnlineUser } from "../types/chat.types";
+import { ChatMessageModel } from "../models/ChatMessage";
 
-// Maximum number of messages retained per room (FIFO eviction).
-// Oldest messages are dropped when the cap is reached.
+// Maximum number of messages returned per room.
 export const MAX_MESSAGES_PER_ROOM = 100;
 
-// Map of fileId → array of ChatMessages (ordered oldest-first)
-const messageStore = new Map<string, ChatMessage[]>();
-
-// Map of fileId → array of OnlineUsers
+// Map of fileId → array of OnlineUsers (ephemeral socket-connection state,
+// intentionally kept in memory — it has no meaning across restarts).
 const onlineUserStore = new Map<string, OnlineUser[]>();
 
-// ── Message helpers ────────────────────────────────────────────────────────────
+// ── Message helpers (MongoDB-backed) ────────────────────────────────────────────
 
-export function getRoomMessages(fileId: string): ChatMessage[] {
-  return messageStore.get(fileId) ?? [];
+export async function getRoomMessages(fileId: string): Promise<ChatMessage[]> {
+  const docs = await ChatMessageModel.find({ fileId })
+    .sort({ timestamp: 1 })
+    .limit(MAX_MESSAGES_PER_ROOM)
+    .lean();
+  return docs.map((d) => ({
+    id: d._id,
+    fileId: d.fileId,
+    userId: d.userId,
+    userName: d.userName,
+    userEmail: d.userEmail ?? '',
+    content: d.content,
+    timestamp: d.timestamp.toISOString(),
+  }));
 }
 
-export function addMessage(message: ChatMessage): void {
-  const messages = messageStore.get(message.fileId) ?? [];
-  messages.push(message);
-  // Evict oldest messages when cap is exceeded
-  if (messages.length > MAX_MESSAGES_PER_ROOM) {
-    messages.splice(0, messages.length - MAX_MESSAGES_PER_ROOM);
-  }
-  messageStore.set(message.fileId, messages);
+export async function addMessage(message: ChatMessage): Promise<void> {
+  await ChatMessageModel.create({
+    _id: message.id,
+    fileId: message.fileId,
+    userId: message.userId,
+    userName: message.userName,
+    userEmail: message.userEmail,
+    content: message.content,
+    timestamp: new Date(message.timestamp),
+  });
 }
 
-export function clearRoomMessages(fileId: string): void {
-  messageStore.delete(fileId);
+export async function clearRoomMessages(fileId: string): Promise<void> {
+  await ChatMessageModel.deleteMany({ fileId });
 }
 
 // ── Online-user helpers ────────────────────────────────────────────────────────

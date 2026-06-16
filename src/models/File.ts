@@ -6,9 +6,9 @@ export interface IFile {
   originalName: string
   mimeType: string
   size: number
-  gcsBucket: string
-  gcsKey: string
+  diskPath: string
   publicUrl: string
+  adminOnlyChat: boolean
   createdAt: Date
 }
 
@@ -18,9 +18,9 @@ const fileSchema = new Schema<IFile>({
   originalName: { type: String, required: true },
   mimeType: { type: String, required: true },
   size: { type: Number, required: true },
-  gcsBucket: { type: String, required: true },
-  gcsKey: { type: String, required: true },
+  diskPath: { type: String, required: true },
   publicUrl: { type: String, required: true },
+  adminOnlyChat: { type: Boolean, default: false },
   createdAt: { type: Date, default: () => new Date() },
 })
 

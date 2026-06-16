@@ -7,7 +7,7 @@ import { getOnlineUsers } from "../socketio/roomManager";
  *
  * Returns paginated chat history for a file room.
  */
-export function getMessageHistory(req: Request, res: Response): void {
+export async function getMessageHistory(req: Request, res: Response): Promise<void> {
   const { fileId } = req.params;
   const limit = Math.min(parseInt((req.query.limit as string) ?? "50", 10), 200);
   const before = req.query.before as string | undefined;
@@ -17,7 +17,7 @@ export function getMessageHistory(req: Request, res: Response): void {
     return;
   }
 
-  const messages = getMessages(fileId, isNaN(limit) ? 50 : limit, before);
+  const messages = await getMessages(fileId, isNaN(limit) ? 50 : limit, before);
   res.json({ messages });
 }
 

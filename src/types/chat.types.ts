@@ -3,6 +3,7 @@ export interface ChatMessage {
   fileId: string;
   userId: string;
   userName: string;
+  userEmail: string;
   content: string;
   timestamp: string; // ISO 8601
 }
@@ -29,6 +30,7 @@ export interface SendMessagePayload {
   fileId: string;
   userId: string;
   userName: string;
+  userEmail: string;
   content: string;
 }
 
@@ -36,6 +38,12 @@ export interface TypingPayload {
   fileId: string;
   userId: string;
   userName: string;
+}
+
+export interface SetAdminOnlyPayload {
+  fileId: string;
+  userId: string;
+  adminOnly: boolean;
 }
 
 export interface StopTypingPayload {

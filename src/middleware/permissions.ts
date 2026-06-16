@@ -15,7 +15,7 @@ declare global {
 
 export const requirePermission =
   (action: FileAccessAction = "view") =>
-  (req: Request, res: Response, next: NextFunction): void => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const userId = req.user?.id;
     const fileId = req.params.fileId ?? req.params.id;
 
@@ -30,7 +30,7 @@ export const requirePermission =
     }
 
     try {
-      req.filePermission = requireFileAccess(fileId, userId, action);
+      req.filePermission = await requireFileAccess(fileId, userId, action);
       next();
     } catch (error: any) {
       const status = error.message === "File not found." ? 404 : 403;

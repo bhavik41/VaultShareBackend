@@ -1,9 +1,7 @@
-import { Storage } from "@google-cloud/storage";
-import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
 import path from "path";
-import { requireFileAccess } from "../utils/accessControl";
+import { v4 as uuidv4 } from "uuid";
 import * as auditService from "./audit.service";
-
 import {
   createFile,
   getFileById,
@@ -11,174 +9,83 @@ import {
   deleteFile as deleteFileFromStore,
   StoredFile,
 } from "../db/fileStore";
-
-// ── GCS client ────────────────────────────────────────────────────────────────
-// Credentials are loaded from environment variables.
-// GCP_KEY_FILE takes priority (path to a service-account JSON).
-// Otherwise falls back to individual GOOGLE_* env vars so the credentials can
-// be stored directly in .env without putting a JSON file on disk.
-function buildStorageClient(): Storage {
-  if (process.env.GCP_KEY_FILE) {
-    return new Storage({ keyFilename: process.env.GCP_KEY_FILE });
-  }
-
-  const projectId = process.env.GCP_PROJECT_ID;
-  const clientEmail = process.env.GCP_CLIENT_EMAIL;
-  const privateKey = process.env.GCP_PRIVATE_KEY?.replace(/\\n/g, "\n");
-
-  if (projectId && clientEmail && privateKey) {
-    return new Storage({
-      projectId,
-      credentials: { client_email: clientEmail, private_key: privateKey },
-    });
-  }
-
-  // Fallback: Application Default Credentials (works on GCP infra / gcloud auth)
-  return new Storage();
-}
-
-const storage = buildStorageClient();
-const BUCKET_NAME = process.env.GCP_BUCKET_NAME as string;
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildGcsKey(userId: string, originalName: string): string {
-  const ext = path.extname(originalName);
-  return `uploads/${userId}/${uuidv4()}${ext}`;
-}
-
-// ── Service functions ─────────────────────────────────────────────────────────
+import { getFilePermission } from "../utils/accessControl";
 
 export interface UploadResult {
   file: StoredFile;
 }
 
-/**
- * Upload a file buffer to GCS and persist metadata.
- */
 export async function uploadFile(
   userId: string,
-  originalName: string,
-  mimeType: string,
-  buffer: Buffer,
-  size: number,
+  multerFile: Express.Multer.File,
 ): Promise<UploadResult> {
-  if (!BUCKET_NAME) {
-    throw new Error("GCP_BUCKET_NAME is not configured.");
-  }
-
-  const gcsKey = buildGcsKey(userId, originalName);
-  const bucket = storage.bucket(BUCKET_NAME);
-  const gcsFile = bucket.file(gcsKey);
-
-  // Upload buffer to GCS
-  await gcsFile.save(buffer, {
-    metadata: { contentType: mimeType },
-    resumable: false,
-  });
-
-  // Generate a signed URL valid for 7 days for the uploader to share
-  const [signedUrl] = await gcsFile.getSignedUrl({
-    action: "read",
-    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-  });
-
   const fileId = uuidv4();
-  const stored = createFile({
+  const stored = await createFile({
     id: fileId,
     userId,
-    originalName,
-    mimeType,
-    size,
-    gcsBucket: BUCKET_NAME,
-    gcsKey,
-    publicUrl: signedUrl,
+    originalName: multerFile.originalname,
+    mimeType: multerFile.mimetype,
+    size: multerFile.size,
+    diskPath: multerFile.path,
+    publicUrl: `/api/files/${fileId}/download`,
+    adminOnlyChat: false,
     createdAt: new Date(),
   });
 
-  auditService.logAction(fileId, userId, "upload", `Uploaded file ${originalName}`);
+  auditService.logAction(fileId, userId, "upload", `Uploaded file ${multerFile.originalname}`);
 
   return { file: stored };
 }
 
-/**
- * List all files uploaded by a user.
- */
-export function listFiles(userId: string): StoredFile[] {
+export async function listFiles(userId: string): Promise<StoredFile[]> {
   return getFilesByUser(userId);
 }
 
-/**
- * Get a fresh short-lived signed URL for a file (sharing / preview use case).
- * The URL is valid for 1 hour and can be handed to anyone.
- */
-export async function getSignedUrl(
+export async function downloadFile(
   fileId: string,
   requestingUserId: string,
-): Promise<string> {
-  const { file: stored } = requireFileAccess(fileId, requestingUserId, "view");
+): Promise<{ stream: fs.ReadStream; file: StoredFile }> {
+  // Owner or any user the file is shared with (viewer/editor) may download.
+  const permission = await getFilePermission(fileId, requestingUserId);
+  if (!permission) throw new Error("Access denied.");
+  const { file } = permission;
 
-  const [signedUrl] = await storage
-    .bucket(stored.gcsBucket)
-    .file(stored.gcsKey)
-    .getSignedUrl({
-      action: "read",
-      expires: Date.now() + 60 * 60 * 1000,
-    });
+  if (!fs.existsSync(file.diskPath)) throw new Error("File no longer exists on disk.");
 
-  auditService.logAction(fileId, requestingUserId, "view", "Generated signed URL for preview");
+  auditService.logAction(fileId, requestingUserId, "download", `Downloaded ${file.originalName}`);
 
-  return signedUrl;
+  return { stream: fs.createReadStream(file.diskPath), file };
 }
 
-/**
- * Stream a file directly from GCS to the HTTP response.
- * Returns the GCS ReadStream and file metadata so the controller
- * can set the correct response headers before piping.
- */
-export async function streamFileDownload(
-  fileId: string,
-  requestingUserId: string,
-): Promise<{
-  stream: NodeJS.ReadableStream;
-  originalName: string;
-  mimeType: string;
-  size: number;
-}> {
-  const { file: stored } = requireFileAccess(fileId, requestingUserId, "view");
-
-  const gcsFile = storage.bucket(stored.gcsBucket).file(stored.gcsKey);
-
-  const [exists] = await gcsFile.exists();
-  if (!exists) throw new Error("File no longer exists in storage.");
-
-  const readStream = gcsFile.createReadStream();
-
-  auditService.logAction(fileId, requestingUserId, "download", "Started file download");
-
-  return {
-    stream: readStream,
-    originalName: stored.originalName,
-    mimeType: stored.mimeType,
-    size: stored.size,
-  };
-}
-
-/**
- * Delete a file from GCS and remove its metadata record.
- */
 export async function deleteFile(
   fileId: string,
   requestingUserId: string,
-): Promise<void> {
-  const { file: stored } = requireFileAccess(fileId, requestingUserId, "owner");
+): Promise<StoredFile> {
+  const file = await getFileById(fileId);
+  if (!file) throw new Error("File not found.");
+  if (file.userId !== requestingUserId) throw new Error("Access denied.");
 
-  await storage
-    .bucket(stored.gcsBucket)
-    .file(stored.gcsKey)
-    .delete({ ignoreNotFound: true });
+  if (fs.existsSync(file.diskPath)) {
+    fs.unlinkSync(file.diskPath);
+  }
 
-  deleteFileFromStore(fileId);
+  await deleteFileFromStore(fileId);
 
-  auditService.logAction(fileId, requestingUserId, "delete", "Deleted file");
+  auditService.logAction(fileId, requestingUserId, "delete", `Deleted ${file.originalName}`);
+
+  return file;
+}
+
+export async function getFileDetails(
+  fileId: string,
+  requestingUserId: string,
+): Promise<StoredFile> {
+  // Owner or any user the file is shared with may view its details.
+  const permission = await getFilePermission(fileId, requestingUserId);
+  if (!permission) throw new Error("Access denied.");
+  const { file } = permission;
+
+  auditService.logAction(fileId, requestingUserId, "view", `Viewed ${file.originalName}`);
+
+  return file;
 }

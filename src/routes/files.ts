@@ -8,26 +8,26 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post("/upload", upload.single("file"), FileController.upload);
+router.post("/upload", upload.single("file"), FileController.uploadFile);
 
-router.get("/", FileController.list);
+router.get("/", FileController.listFiles);
 
 router.get(
-  "/:id/download",
+  "/:fileId/download",
   requirePermission("view"),
-  FileController.download,
+  FileController.downloadFile,
 );
 
 router.get(
-  "/:id/signed-url",
+  "/:fileId/view",
   requirePermission("view"),
-  FileController.signedUrl,
+  FileController.viewFile,
 );
 
 router.delete(
-  "/:id",
+  "/:fileId",
   requirePermission("owner"),
-  FileController.delete,
+  FileController.deleteFile,
 );
 
 export default router;

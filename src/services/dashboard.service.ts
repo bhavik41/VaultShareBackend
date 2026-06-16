@@ -1,4 +1,4 @@
-import { getAllFiles, getFilesByUser, StoredFile } from "../db/fileStore";
+import { getFileById, getFilesByUser, StoredFile } from "../db/fileStore";
 import {
   FileShare,
   getSharesByFile,
@@ -56,8 +56,8 @@ export interface DashboardActivity {
   createdAt: Date;
 }
 
-function ownerInfo(ownerId: string) {
-  const owner = findUserById(ownerId);
+async function ownerInfo(ownerId: string) {
+  const owner = await findUserById(ownerId);
 
   return {
     ownerName: owner?.name ?? "Unknown user",
@@ -65,22 +65,25 @@ function ownerInfo(ownerId: string) {
   };
 }
 
-function collaboratorsFor(fileId: string): DashboardCollaborator[] {
-  return getSharesByFile(fileId).map((share) => {
-    const user = findUserById(share.userId);
+async function collaboratorsFor(fileId: string): Promise<DashboardCollaborator[]> {
+  const shares = await getSharesByFile(fileId);
+  return Promise.all(
+    shares.map(async (share) => {
+      const user = await findUserById(share.userId);
 
-    return {
-      id: share.id,
-      userId: share.userId,
-      name: user?.name ?? "Unknown user",
-      email: user?.email ?? "",
-      role: share.role,
-    };
-  });
+      return {
+        id: share.id,
+        userId: share.userId,
+        name: user?.name ?? "Unknown user",
+        email: user?.email ?? "",
+        role: share.role,
+      };
+    }),
+  );
 }
 
-function ownedDocument(file: StoredFile): DashboardDocument {
-  const owner = ownerInfo(file.userId);
+async function ownedDocument(file: StoredFile): Promise<DashboardDocument> {
+  const owner = await ownerInfo(file.userId);
 
   return {
     id: file.id,
@@ -93,15 +96,15 @@ function ownedDocument(file: StoredFile): DashboardDocument {
     accessLevel: "owner",
     permissionStatus: "Owner access",
     createdAt: file.createdAt,
-    collaborators: collaboratorsFor(file.id),
+    collaborators: await collaboratorsFor(file.id),
   };
 }
 
-function sharedDocument(share: FileShare): DashboardDocument | null {
-  const file = getAllFiles().find((item) => item.id === share.fileId);
+async function sharedDocument(share: FileShare): Promise<DashboardDocument | null> {
+  const file = await getFileById(share.fileId);
   if (!file) return null;
 
-  const owner = ownerInfo(share.ownerId);
+  const owner = await ownerInfo(share.ownerId);
 
   return {
     id: file.id,
@@ -116,7 +119,7 @@ function sharedDocument(share: FileShare): DashboardDocument | null {
       share.role === "editor" ? "Can view and edit" : "Can view",
     createdAt: file.createdAt,
     sharedAt: share.createdAt,
-    collaborators: collaboratorsFor(file.id),
+    collaborators: await collaboratorsFor(file.id),
   };
 }
 
@@ -184,20 +187,24 @@ function sortDocuments(
   });
 }
 
-export function listDashboardDocuments(
+export async function listDashboardDocuments(
   userId: string,
   filters: DashboardFilters = {},
-): DashboardDocument[] {
-  const uploaded = getFilesByUser(userId).map(ownedDocument);
-  const shared = getSharesByUser(userId)
-    .map(sharedDocument)
-    .filter((document): document is DashboardDocument => document !== null);
+): Promise<DashboardDocument[]> {
+  const files = await getFilesByUser(userId);
+  const uploaded = await Promise.all(files.map(ownedDocument));
+
+  const shares = await getSharesByUser(userId);
+  const sharedResolved = await Promise.all(shares.map(sharedDocument));
+  const shared = sharedResolved.filter(
+    (document): document is DashboardDocument => document !== null,
+  );
 
   return sortDocuments(filterDocuments([...uploaded, ...shared], filters), filters.sort);
 }
 
-export function getDashboardStats(userId: string) {
-  const documents = listDashboardDocuments(userId);
+export async function getDashboardStats(userId: string) {
+  const documents = await listDashboardDocuments(userId);
   const uploadedFiles = documents.filter((document) => document.ownership === "owned");
   const sharedFiles = documents.filter((document) => document.ownership === "shared");
   const sharedByMe = uploadedFiles.filter(
@@ -220,8 +227,9 @@ export function getDashboardStats(userId: string) {
   };
 }
 
-export function getRecentActivity(userId: string): DashboardActivity[] {
-  const uploadedActivities = getFilesByUser(userId).map((file) => ({
+export async function getRecentActivity(userId: string): Promise<DashboardActivity[]> {
+  const userFiles = await getFilesByUser(userId);
+  const uploadedActivities = userFiles.map((file) => ({
     id: `uploaded-${file.id}`,
     type: "uploaded" as const,
     message: `Uploaded ${file.originalName}`,
@@ -230,8 +238,9 @@ export function getRecentActivity(userId: string): DashboardActivity[] {
     createdAt: file.createdAt,
   }));
 
-  const sharedWithMeActivities = getSharesByUser(userId)
-    .map((share) => sharedDocument(share))
+  const shares = await getSharesByUser(userId);
+  const sharedDocs = await Promise.all(shares.map((share) => sharedDocument(share)));
+  const sharedWithMeActivities = sharedDocs
     .filter((document): document is DashboardDocument => document !== null)
     .map((document) => ({
       id: `shared-with-me-${document.id}`,
@@ -242,20 +251,26 @@ export function getRecentActivity(userId: string): DashboardActivity[] {
       createdAt: document.sharedAt ?? document.createdAt,
     }));
 
-  const sharedByMeActivities = getFilesByUser(userId).flatMap((file) =>
-    getSharesByFile(file.id).map((share) => {
-      const collaborator = findUserById(share.userId);
+  const sharedByMeNested = await Promise.all(
+    userFiles.map(async (file) => {
+      const fileShares = await getSharesByFile(file.id);
+      return Promise.all(
+        fileShares.map(async (share) => {
+          const collaborator = await findUserById(share.userId);
 
-      return {
-        id: `shared-by-me-${share.id}`,
-        type: "shared_by_me" as const,
-        message: `Shared ${file.originalName} with ${collaborator?.name ?? "a collaborator"}`,
-        fileId: file.id,
-        fileName: file.originalName,
-        createdAt: share.createdAt,
-      };
+          return {
+            id: `shared-by-me-${share.id}`,
+            type: "shared_by_me" as const,
+            message: `Shared ${file.originalName} with ${collaborator?.name ?? "a collaborator"}`,
+            fileId: file.id,
+            fileName: file.originalName,
+            createdAt: share.createdAt,
+          };
+        }),
+      );
     }),
   );
+  const sharedByMeActivities = sharedByMeNested.flat();
 
   return [
     ...uploadedActivities,
@@ -266,14 +281,14 @@ export function getRecentActivity(userId: string): DashboardActivity[] {
     .slice(0, 10);
 }
 
-export function getDashboardOverview(userId: string, filters: DashboardFilters = {}) {
-  const documents = listDashboardDocuments(userId, filters);
+export async function getDashboardOverview(userId: string, filters: DashboardFilters = {}) {
+  const documents = await listDashboardDocuments(userId, filters);
 
   return {
     documents,
     uploadedFiles: documents.filter((document) => document.ownership === "owned"),
     sharedFiles: documents.filter((document) => document.ownership === "shared"),
-    stats: getDashboardStats(userId),
-    recentActivity: getRecentActivity(userId),
+    stats: await getDashboardStats(userId),
+    recentActivity: await getRecentActivity(userId),
   };
 }
