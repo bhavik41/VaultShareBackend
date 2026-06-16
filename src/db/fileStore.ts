@@ -1,37 +1,79 @@
 /**
- * In-memory file metadata store.
- * Each record tracks what was uploaded, by whom, and where it lives in GCS.
+ * File metadata store backed by MongoDB.
+ *
+ * The uploaded bytes live on local disk (see middleware/upload.ts); this store
+ * persists the metadata that maps a file id to its disk path, owner, etc.
  */
+import { FileModel, IFile } from "../models/File";
 
 export interface StoredFile {
   id: string;
   userId: string;
   originalName: string;
   mimeType: string;
-  size: number; // bytes
-  gcsBucket: string;
-  gcsKey: string; // path inside the bucket
-  publicUrl: string; // signed or public URL
+  size: number;
+  diskPath: string;
+  publicUrl: string;
+  adminOnlyChat: boolean;
   createdAt: Date;
 }
 
-const files: Map<string, StoredFile> = new Map();
+function toStoredFile(doc: IFile): StoredFile {
+  return {
+    id: doc._id,
+    userId: doc.userId,
+    originalName: doc.originalName,
+    mimeType: doc.mimeType,
+    size: doc.size,
+    diskPath: doc.diskPath,
+    publicUrl: doc.publicUrl,
+    adminOnlyChat: doc.adminOnlyChat ?? false,
+    createdAt: doc.createdAt,
+  };
+}
 
-export const createFile = (file: StoredFile): StoredFile => {
-  files.set(file.id, file);
-  return file;
+export const createFile = async (file: StoredFile): Promise<StoredFile> => {
+  const doc = await FileModel.create({
+    _id: file.id,
+    userId: file.userId,
+    originalName: file.originalName,
+    mimeType: file.mimeType,
+    size: file.size,
+    diskPath: file.diskPath,
+    publicUrl: file.publicUrl,
+    createdAt: file.createdAt,
+  });
+  return toStoredFile(doc.toObject());
 };
 
-export const getFileById = (id: string): StoredFile | undefined =>
-  files.get(id);
-
-export const getFilesByUser = (userId: string): StoredFile[] =>
-  Array.from(files.values()).filter((f) => f.userId === userId);
-
-export const deleteFile = (id: string): boolean => {
-  if (!files.has(id)) return false;
-  files.delete(id);
-  return true;
+export const getFileById = async (id: string): Promise<StoredFile | undefined> => {
+  const doc = await FileModel.findById(id).lean();
+  return doc ? toStoredFile(doc) : undefined;
 };
 
-export const getAllFiles = (): StoredFile[] => Array.from(files.values());
+export const getFilesByUser = async (userId: string): Promise<StoredFile[]> => {
+  const docs = await FileModel.find({ userId }).sort({ createdAt: -1 }).lean();
+  return docs.map(toStoredFile);
+};
+
+export const setAdminOnlyChat = async (
+  id: string,
+  adminOnlyChat: boolean,
+): Promise<StoredFile | undefined> => {
+  const doc = await FileModel.findByIdAndUpdate(
+    id,
+    { adminOnlyChat },
+    { new: true },
+  ).lean();
+  return doc ? toStoredFile(doc) : undefined;
+};
+
+export const deleteFile = async (id: string): Promise<boolean> => {
+  const res = await FileModel.deleteOne({ _id: id });
+  return res.deletedCount > 0;
+};
+
+export const getAllFiles = async (): Promise<StoredFile[]> => {
+  const docs = await FileModel.find().lean();
+  return docs.map(toStoredFile);
+};

@@ -7,6 +7,7 @@ import dashboardRouter from "./routes/dashboard";
 import auditRoutes, { activityRouter } from "./routes/audit";
 import starredRoutes from "./routes/starred";
 import activityRoutes from "./routes/activity";
+import chatRouter from "./routes/chat";
 
 const app = express()
 
@@ -28,5 +29,6 @@ app.use("/api/collaboration", collaborationRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/starred", starredRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/chat", chatRouter);
 
 export default app

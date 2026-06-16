@@ -20,29 +20,29 @@ const actionRank: Record<FileAccessAction, number> = {
   owner: 3,
 };
 
-export function getFilePermission(
+export async function getFilePermission(
   fileId: string,
   userId: string,
-): FilePermission | null {
-  const file = getFileById(fileId);
+): Promise<FilePermission | null> {
+  const file = await getFileById(fileId);
   if (!file) throw new Error("File not found.");
 
   if (file.userId === userId) {
     return { file, role: "owner" };
   }
 
-  const share = getFileShare(fileId, userId);
+  const share = await getFileShare(fileId, userId);
   if (!share) return null;
 
   return { file, role: share.role };
 }
 
-export function requireFileAccess(
+export async function requireFileAccess(
   fileId: string,
   userId: string,
   action: FileAccessAction = "view",
-): FilePermission {
-  const permission = getFilePermission(fileId, userId);
+): Promise<FilePermission> {
+  const permission = await getFilePermission(fileId, userId);
 
   if (!permission) {
     throw new Error("Access denied.");

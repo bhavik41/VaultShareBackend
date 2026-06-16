@@ -48,35 +48,35 @@ function parseFilters(req: Request): DashboardFilters {
 }
 
 export class DashboardController {
-  static overview(req: Request, res: Response): void {
+  static async overview(req: Request, res: Response): Promise<void> {
     try {
-      res.status(200).json(getDashboardOverview(req.user!.id, parseFilters(req)));
+      res.status(200).json(await getDashboardOverview(req.user!.id, parseFilters(req)));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  static documents(req: Request, res: Response): void {
+  static async documents(req: Request, res: Response): Promise<void> {
     try {
       res.status(200).json({
-        documents: listDashboardDocuments(req.user!.id, parseFilters(req)),
+        documents: await listDashboardDocuments(req.user!.id, parseFilters(req)),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  static stats(req: Request, res: Response): void {
+  static async stats(req: Request, res: Response): Promise<void> {
     try {
-      res.status(200).json({ stats: getDashboardStats(req.user!.id) });
+      res.status(200).json({ stats: await getDashboardStats(req.user!.id) });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   }
 
-  static activity(req: Request, res: Response): void {
+  static async activity(req: Request, res: Response): Promise<void> {
     try {
-      res.status(200).json({ activity: getRecentActivity(req.user!.id) });
+      res.status(200).json({ activity: await getRecentActivity(req.user!.id) });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

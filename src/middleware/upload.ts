@@ -1,10 +1,10 @@
 import multer from "multer";
+import path from "path";
+import fs from "fs";
 import type { Request } from "express";
+import { v4 as uuidv4 } from "uuid";
 
-// ── Allowed MIME types ────────────────────────────────────────────────────────
-// Add or remove entries here to control what file types are accepted.
 const ALLOWED_MIME_TYPES = new Set([
-  // Documents
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -14,43 +14,44 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "text/plain",
   "text/csv",
-  // Images
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
   "image/svg+xml",
-  // Video
   "video/mp4",
   "video/webm",
   "video/quicktime",
-  // Audio
   "audio/mpeg",
   "audio/wav",
   "audio/ogg",
-  // Archives
   "application/zip",
   "application/x-zip-compressed",
   "application/x-rar-compressed",
   "application/x-tar",
   "application/gzip",
   "application/x-7z-compressed",
-  // Design / dev
-  "application/octet-stream", // .fig, .sketch, .psd, binary blobs
+  "application/octet-stream",
   "application/x-photoshop",
   "image/vnd.adobe.photoshop",
-  // Code / data
   "application/json",
   "application/xml",
   "text/xml",
   "text/html",
 ]);
 
-// Max file size: default 50 MB, overridable via MAX_FILE_SIZE_MB env var
 const MAX_MB = parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10);
 
-// Store file in memory — we forward the buffer directly to GCS
-const storage = multer.memoryStorage();
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${uuidv4()}${ext}`);
+  },
+});
 
 function fileFilter(
   _req: Request,
@@ -62,8 +63,7 @@ function fileFilter(
   } else {
     cb(
       new Error(
-        `File type "${file.mimetype}" is not allowed. ` +
-          `Accepted types: PDF, Word, Excel, PowerPoint, images, video, audio, ZIP, and common dev formats.`,
+        `File type "${file.mimetype}" is not allowed. Accepted types: PDF, Word, Excel, PowerPoint, images, video, audio, ZIP, and common dev formats.`,
       ),
     );
   }

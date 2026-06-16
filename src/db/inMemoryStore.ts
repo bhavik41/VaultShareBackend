@@ -1,7 +1,7 @@
 /**
- * Simple in-memory user store.
- * Replace with a real database (MongoDB, PostgreSQL, etc.) for production.
+ * User store backed by MongoDB.
  */
+import { UserModel, IUser } from "../models/User"
 
 export interface StoredUser {
   id: string
@@ -19,39 +19,61 @@ export interface StoredUser {
   resetOtpExpiry: Date | null
 }
 
-const users: Map<string, StoredUser> = new Map()
-
-export const findUserByEmail = (email: string): StoredUser | undefined => {
-  for (const user of users.values()) {
-    if (user.email.toLowerCase() === email.toLowerCase()) return user
+function toStoredUser(doc: IUser): StoredUser {
+  return {
+    id: doc._id,
+    name: doc.name,
+    email: doc.email,
+    passwordHash: doc.passwordHash,
+    createdAt: doc.createdAt,
+    refreshToken: doc.refreshToken,
+    twoFactorSecret: doc.twoFactorSecret,
+    twoFactorEnabled: doc.twoFactorEnabled,
+    resetOtp: doc.resetOtp,
+    resetOtpExpiry: doc.resetOtpExpiry,
   }
-  return undefined
 }
 
-export const findUserById = (id: string): StoredUser | undefined => {
-  return users.get(id)
+export const findUserByEmail = async (email: string): Promise<StoredUser | undefined> => {
+  const doc = await UserModel.findOne({ email: email.toLowerCase() }).lean()
+  return doc ? toStoredUser(doc) : undefined
 }
 
-export const findUserByRefreshToken = (token: string): StoredUser | undefined => {
-  for (const user of users.values()) {
-    if (user.refreshToken === token) return user
-  }
-  return undefined
+export const findUserById = async (id: string): Promise<StoredUser | undefined> => {
+  const doc = await UserModel.findById(id).lean()
+  return doc ? toStoredUser(doc) : undefined
 }
 
-export const createUser = (user: StoredUser): StoredUser => {
-  users.set(user.id, user)
-  return user
+export const findUserByRefreshToken = async (token: string): Promise<StoredUser | undefined> => {
+  const doc = await UserModel.findOne({ refreshToken: token }).lean()
+  return doc ? toStoredUser(doc) : undefined
 }
 
-export const updateUser = (id: string, updates: Partial<StoredUser>): StoredUser | undefined => {
-  const user = users.get(id)
-  if (!user) return undefined
-  const updated = { ...user, ...updates }
-  users.set(id, updated)
-  return updated
+export const createUser = async (user: StoredUser): Promise<StoredUser> => {
+  const doc = await UserModel.create({
+    _id: user.id,
+    name: user.name,
+    email: user.email,
+    passwordHash: user.passwordHash,
+    createdAt: user.createdAt,
+    refreshToken: user.refreshToken,
+    twoFactorSecret: user.twoFactorSecret,
+    twoFactorEnabled: user.twoFactorEnabled,
+    resetOtp: user.resetOtp,
+    resetOtpExpiry: user.resetOtpExpiry,
+  })
+  return toStoredUser(doc.toObject())
 }
 
-export const getAllUsers = (): StoredUser[] => {
-  return Array.from(users.values())
+export const updateUser = async (
+  id: string,
+  updates: Partial<StoredUser>,
+): Promise<StoredUser | undefined> => {
+  const doc = await UserModel.findByIdAndUpdate(id, updates, { new: true }).lean()
+  return doc ? toStoredUser(doc) : undefined
+}
+
+export const getAllUsers = async (): Promise<StoredUser[]> => {
+  const docs = await UserModel.find().lean()
+  return docs.map(toStoredUser)
 }

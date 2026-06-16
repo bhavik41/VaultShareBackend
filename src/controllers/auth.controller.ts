@@ -83,10 +83,10 @@ export class AuthController {
     }
   }
 
-  static refresh(
+  static async refresh(
     req: Request<object, object, RefreshBody>,
     res: Response,
-  ): void {
+  ): Promise<void> {
     try {
       const { refreshToken } = req.body;
       if (!refreshToken) {
@@ -95,7 +95,7 @@ export class AuthController {
       }
 
       const { newAccessToken, newRefreshToken } =
-        authService.refresh(refreshToken);
+        await authService.refresh(refreshToken);
       res
         .status(200)
         .json({ token: newAccessToken, refreshToken: newRefreshToken });
@@ -104,14 +104,14 @@ export class AuthController {
     }
   }
 
-  static logout(req: Request, res: Response): void {
-    if (req.user) authService.logout(req.user.id);
+  static async logout(req: Request, res: Response): Promise<void> {
+    if (req.user) await authService.logout(req.user.id);
     res.status(200).json({ message: "Logged out successfully." });
   }
 
-  static me(req: Request, res: Response): void {
+  static async me(req: Request, res: Response): Promise<void> {
     try {
-      const user = authService.getMe(req.user!.id);
+      const user = await authService.getMe(req.user!.id);
       res.status(200).json({ user });
     } catch (error: any) {
       res.status(404).json({ message: error.message });
@@ -180,27 +180,27 @@ export class AuthController {
     }
   }
 
-  static verify2fa(
+  static async verify2fa(
     req: Request<object, object, Verify2FABody>,
     res: Response,
-  ): void {
+  ): Promise<void> {
     try {
       const { token } = req.body;
       if (!token) {
         res.status(400).json({ message: "Token is required." });
         return;
       }
-      authService.verify2fa(req.user!.id, token);
+      await authService.verify2fa(req.user!.id, token);
       res.status(200).json({ message: "2FA enabled successfully." });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   }
 
-  static validate2fa(
+  static async validate2fa(
     req: Request<object, object, Validate2FABody>,
     res: Response,
-  ): void {
+  ): Promise<void> {
     try {
       const { tempToken, token } = req.body;
       if (!tempToken || !token) {
@@ -210,7 +210,7 @@ export class AuthController {
         return;
       }
 
-      const result = authService.validate2fa(tempToken, token);
+      const result = await authService.validate2fa(tempToken, token);
       res.status(200).json({
         message: "2FA verified. Signed in successfully.",
         token: result.accessToken,
@@ -228,17 +228,17 @@ export class AuthController {
     }
   }
 
-  static disable2fa(
+  static async disable2fa(
     req: Request<object, object, Verify2FABody>,
     res: Response,
-  ): void {
+  ): Promise<void> {
     try {
       const { token } = req.body;
       if (!token) {
         res.status(400).json({ message: "Token is required." });
         return;
       }
-      authService.disable2fa(req.user!.id, token);
+      await authService.disable2fa(req.user!.id, token);
       res.status(200).json({ message: "2FA disabled successfully." });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
