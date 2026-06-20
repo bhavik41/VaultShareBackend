@@ -2,6 +2,7 @@ import { Storage } from "@google-cloud/storage";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { requireFileAccess } from "../utils/accessControl";
+import * as auditService from "./audit.service";
 
 import {
   createFile,
@@ -95,6 +96,8 @@ export async function uploadFile(
     createdAt: new Date(),
   });
 
+  auditService.logAction(fileId, userId, "upload", `Uploaded file ${originalName}`);
+
   return { file: stored };
 }
 
@@ -123,6 +126,8 @@ export async function getSignedUrl(
       expires: Date.now() + 60 * 60 * 1000,
     });
 
+  auditService.logAction(fileId, requestingUserId, "view", "Generated signed URL for preview");
+
   return signedUrl;
 }
 
@@ -149,6 +154,8 @@ export async function streamFileDownload(
 
   const readStream = gcsFile.createReadStream();
 
+  auditService.logAction(fileId, requestingUserId, "download", "Started file download");
+
   return {
     stream: readStream,
     originalName: stored.originalName,
@@ -172,4 +179,6 @@ export async function deleteFile(
     .delete({ ignoreNotFound: true });
 
   deleteFileFromStore(fileId);
+
+  auditService.logAction(fileId, requestingUserId, "delete", "Deleted file");
 }

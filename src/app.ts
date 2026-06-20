@@ -4,6 +4,7 @@ import authRouter from "./routes/auth";
 import filesRouter from "./routes/files";
 import collaborationRouter from "./routes/collaboration";
 import dashboardRouter from "./routes/dashboard";
+import auditRouter from "./routes/audit";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/files", filesRouter);
+app.use("/api/files/:fileId/audit", auditRouter);
 app.use("/api/collaboration", collaborationRouter);
 app.use("/api/dashboard", dashboardRouter);
 
