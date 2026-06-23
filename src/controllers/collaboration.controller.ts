@@ -265,7 +265,7 @@ export class CollaborationController {
         return;
       }
 
-      const { shareLink, file } = validation;
+      const { file } = validation;
       const { stream, originalName, mimeType, size } =
         await fileService.streamFileDownloadForShareLink(file.id);
 
