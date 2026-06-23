@@ -57,6 +57,67 @@ export async function downloadFile(
   return { stream: fs.createReadStream(file.diskPath), file };
 }
 
+/**
+ * Stream a file directly from GCS to the HTTP response.
+ * Returns the GCS ReadStream and file metadata so the controller
+ * can set the correct response headers before piping.
+ */
+export async function streamFileDownload(
+  fileId: string,
+  requestingUserId: string,
+): Promise<{
+  stream: NodeJS.ReadableStream;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}> {
+  const { file: stored } = requireFileAccess(fileId, requestingUserId, "view");
+
+  const gcsFile = storage.bucket(stored.gcsBucket).file(stored.gcsKey);
+
+  const [exists] = await gcsFile.exists();
+  if (!exists) throw new Error("File no longer exists in storage.");
+
+  const readStream = gcsFile.createReadStream();
+
+  return {
+    stream: readStream,
+    originalName: stored.originalName,
+    mimeType: stored.mimeType,
+    size: stored.size,
+  };
+}
+
+export async function streamFileDownloadForShareLink(
+  fileId: string,
+): Promise<{
+  stream: NodeJS.ReadableStream;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}> {
+  const stored = getFileById(fileId);
+  if (!stored) {
+    throw new Error("File not found.");
+  }
+
+  const gcsFile = storage.bucket(stored.gcsBucket).file(stored.gcsKey);
+  const [exists] = await gcsFile.exists();
+  if (!exists) throw new Error("File no longer exists in storage.");
+
+  const readStream = gcsFile.createReadStream();
+
+  return {
+    stream: readStream,
+    originalName: stored.originalName,
+    mimeType: stored.mimeType,
+    size: stored.size,
+  };
+}
+
+/**
+ * Delete a file from GCS and remove its metadata record.
+ */
 export async function deleteFile(
   fileId: string,
   requestingUserId: string,
