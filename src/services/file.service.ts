@@ -1,5 +1,4 @@
 import fs from "fs";
-import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import * as auditService from "./audit.service";
 import {
@@ -9,7 +8,7 @@ import {
   deleteFile as deleteFileFromStore,
   StoredFile,
 } from "../db/fileStore";
-import { getFilePermission } from "../utils/accessControl";
+import { requireFileAccess } from "../utils/accessControl";
 
 export interface UploadResult {
   file: StoredFile;
@@ -45,10 +44,7 @@ export async function downloadFile(
   fileId: string,
   requestingUserId: string,
 ): Promise<{ stream: fs.ReadStream; file: StoredFile }> {
-  // Owner or any user the file is shared with (viewer/editor) may download.
-  const permission = await getFilePermission(fileId, requestingUserId);
-  if (!permission) throw new Error("Access denied.");
-  const { file } = permission;
+  const { file } = await requireFileAccess(fileId, requestingUserId, "download");
 
   if (!fs.existsSync(file.diskPath)) throw new Error("File no longer exists on disk.");
 
@@ -57,6 +53,57 @@ export async function downloadFile(
   return { stream: fs.createReadStream(file.diskPath), file };
 }
 
+/**
+ * Stream a file directly from GCS to the HTTP response.
+ * Returns the GCS ReadStream and file metadata so the controller
+ * can set the correct response headers before piping.
+ */
+export async function streamFileDownload(
+  fileId: string,
+  requestingUserId: string,
+): Promise<{
+  stream: fs.ReadStream;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}> {
+  const { file: stored } = await requireFileAccess(fileId, requestingUserId, "view");
+  if (!fs.existsSync(stored.diskPath)) throw new Error("File no longer exists on disk.");
+
+  return {
+    stream: fs.createReadStream(stored.diskPath),
+    originalName: stored.originalName,
+    mimeType: stored.mimeType,
+    size: stored.size,
+  };
+}
+
+export async function streamFileDownloadForShareLink(
+  fileId: string,
+): Promise<{
+  stream: fs.ReadStream;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}> {
+  const stored = await getFileById(fileId);
+  if (!stored) {
+    throw new Error("File not found.");
+  }
+
+  if (!fs.existsSync(stored.diskPath)) throw new Error("File no longer exists on disk.");
+
+  return {
+    stream: fs.createReadStream(stored.diskPath),
+    originalName: stored.originalName,
+    mimeType: stored.mimeType,
+    size: stored.size,
+  };
+}
+
+/**
+ * Delete a file from GCS and remove its metadata record.
+ */
 export async function deleteFile(
   fileId: string,
   requestingUserId: string,
@@ -81,9 +128,7 @@ export async function getFileDetails(
   requestingUserId: string,
 ): Promise<StoredFile> {
   // Owner or any user the file is shared with may view its details.
-  const permission = await getFilePermission(fileId, requestingUserId);
-  if (!permission) throw new Error("Access denied.");
-  const { file } = permission;
+  const { file } = await requireFileAccess(fileId, requestingUserId, "view");
 
   auditService.logAction(fileId, requestingUserId, "view", `Viewed ${file.originalName}`);
 

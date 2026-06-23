@@ -13,6 +13,11 @@ import {
 export type InvitationStatus = "pending" | "accepted" | "rejected";
 export type CollaboratorRole = "owner" | "editor" | "viewer";
 export type SharedRole = Exclude<CollaboratorRole, "owner">;
+export type ShareLinkPermissionMode =
+  | "viewer"
+  | "editor"
+  | "download"
+  | "admin-download";
 
 export interface CollaborationInvitation {
   id: string;
@@ -41,7 +46,7 @@ export interface ShareLink {
   fileId: string;
   ownerId: string;
   token: string;
-  role: SharedRole;
+  permissionMode: ShareLinkPermissionMode;
   expiresAt: Date;
   revokedAt: Date | null;
   createdAt: Date;
@@ -81,7 +86,7 @@ function toShareLink(doc: IShareLink): ShareLink {
     fileId: doc.fileId,
     ownerId: doc.ownerId,
     token: doc.token,
-    role: doc.role,
+    permissionMode: doc.permissionMode,
     expiresAt: doc.expiresAt,
     revokedAt: doc.revokedAt,
     createdAt: doc.createdAt,
@@ -210,7 +215,7 @@ export const createShareLink = async (shareLink: ShareLink): Promise<ShareLink> 
     fileId: shareLink.fileId,
     ownerId: shareLink.ownerId,
     token: shareLink.token,
-    role: shareLink.role,
+    permissionMode: shareLink.permissionMode,
     expiresAt: shareLink.expiresAt,
     revokedAt: shareLink.revokedAt,
     createdAt: shareLink.createdAt,

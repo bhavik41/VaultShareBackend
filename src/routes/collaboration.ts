@@ -1,10 +1,20 @@
 import { Router } from "express";
 import { CollaborationController } from "../controllers/collaboration.controller";
 import { authenticate } from "../middleware/auth";
+import {
+  validateShareLink as validateShareLinkMiddleware,
+  requireShareLinkDownloadPermission,
+} from "../middleware/shareLink";
 
 const router = Router();
 
-router.get("/share-links/:token", CollaborationController.validateShareLink);
+router.get(
+  "/share-links/:token/download",
+  validateShareLinkMiddleware,
+  requireShareLinkDownloadPermission,
+  CollaborationController.downloadShareLink,
+);
+router.get("/share-links/:token", validateShareLinkMiddleware, CollaborationController.validateShareLink);
 
 router.use(authenticate);
 

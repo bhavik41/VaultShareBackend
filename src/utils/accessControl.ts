@@ -1,7 +1,7 @@
 import { StoredFile, getFileById } from "../db/fileStore";
 import { CollaboratorRole, getFileShare } from "../db/collaborationStore";
 
-export type FileAccessAction = "view" | "edit" | "owner";
+export type FileAccessAction = "view" | "edit" | "download" | "owner";
 
 export interface FilePermission {
   file: StoredFile;
@@ -17,6 +17,7 @@ const roleRank: Record<CollaboratorRole, number> = {
 const actionRank: Record<FileAccessAction, number> = {
   view: 1,
   edit: 2,
+  download: 2,
   owner: 3,
 };
 

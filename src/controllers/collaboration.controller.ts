@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import * as fileService from "../services/file.service";
 import * as collaborationService from "../services/collaboration.service";
 
 function getErrorStatus(message: string): number {
@@ -195,17 +196,17 @@ export class CollaborationController {
   static async createShareLink(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
-      const { role, expiresAt } = req.body;
+      const { permissionMode, expiresAt } = req.body;
 
-      if (!role) {
-        res.status(400).json({ message: "role is required." });
+      if (!permissionMode) {
+        res.status(400).json({ message: "permissionMode is required." });
         return;
       }
 
       const shareLink = await collaborationService.createFileShareLink({
         fileId,
         ownerId: req.user!.id,
-        role,
+        permissionMode,
         expiresAt,
       });
 
@@ -253,6 +254,50 @@ export class CollaborationController {
       res.status(getErrorStatus(error.message)).json({
         message: error.message,
       });
+    }
+  }
+
+  static async downloadShareLink(req: Request, res: Response): Promise<void> {
+    try {
+      const validation = req.shareLinkValidation;
+      if (!validation) {
+        res.status(500).json({ message: "Share link validation missing." });
+        return;
+      }
+
+      const { file } = validation;
+      const { stream, originalName, mimeType, size } =
+        await fileService.streamFileDownloadForShareLink(file.id);
+
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(originalName)}"`,
+      );
+      res.setHeader("Content-Length", size);
+      res.setHeader("Cache-Control", "private, no-cache");
+
+      stream.on("error", (err) => {
+        console.error("[share-download] GCS stream error:", err);
+        res.end();
+      });
+
+      stream.pipe(res);
+    } catch (error: any) {
+      const message = error.message;
+      const status =
+        message === "Share link not found."
+          ? 404
+          : message.includes("expired") || message.includes("revoked")
+          ? 410
+          : message === "Authentication required."
+          ? 401
+          : message === "Only the file owner may download using this link."
+          ? 403
+          : message === "File not found."
+          ? 404
+          : 500;
+      res.status(status).json({ message });
     }
   }
 

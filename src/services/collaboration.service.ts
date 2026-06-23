@@ -2,11 +2,13 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "../utils/uuid";
 import { getFileById } from "../db/fileStore";
 import { findUserByEmail, findUserById } from "../db/inMemoryStore";
+import * as fileService from "./file.service";
 import {
   CollaborationInvitation,
   FileShare,
   ShareLink,
   SharedRole,
+  ShareLinkPermissionMode,
   createFileShare,
   createInvitation,
   createShareLink,
@@ -43,7 +45,7 @@ interface ShareFileInput {
 interface CreateShareLinkInput {
   fileId: string;
   ownerId: string;
-  role: string;
+  permissionMode: string;
   expiresAt?: string;
 }
 
@@ -63,6 +65,23 @@ interface SharedFileResult {
 export function validateSharedRole(role: string): SharedRole {
   if (role === "editor" || role === "viewer") return role;
   throw new Error("Role must be either editor or viewer.");
+}
+
+export function validateShareLinkPermissionMode(
+  permissionMode: string,
+): ShareLinkPermissionMode {
+  if (
+    permissionMode === "viewer" ||
+    permissionMode === "editor" ||
+    permissionMode === "download" ||
+    permissionMode === "admin-download"
+  ) {
+    return permissionMode;
+  }
+
+  throw new Error(
+    "Share link permission mode must be one of viewer, editor, download, or admin-download.",
+  );
 }
 
 async function requireFileOwner(fileId: string, userId: string) {
@@ -332,7 +351,7 @@ export async function listFilesSharedWithMe(userId: string): Promise<SharedFileR
 
 export async function createFileShareLink(input: CreateShareLinkInput): Promise<ShareLink> {
   const { fileId, ownerId } = input;
-  const role = validateSharedRole(input.role);
+  const permissionMode = validateShareLinkPermissionMode(input.permissionMode);
   const file = await requireFileOwner(fileId, ownerId);
 
   const link = await createShareLink({
@@ -340,13 +359,13 @@ export async function createFileShareLink(input: CreateShareLinkInput): Promise<
     fileId: file.id,
     ownerId,
     token: generateShareToken(),
-    role,
+    permissionMode,
     expiresAt: parseExpirationDate(input.expiresAt),
     revokedAt: null,
     createdAt: new Date(),
   });
 
-  auditService.logAction(file.id, ownerId, "share", `Created share link with role ${role}`);
+  auditService.logAction(file.id, ownerId, "share", `Created share link with permission mode ${permissionMode}`);
 
   return link;
 }
@@ -399,9 +418,8 @@ export async function validateShareLinkToken(token: string) {
       ownerId: file.userId,
       ownerName: owner?.name ?? "Unknown user",
       ownerEmail: owner?.email ?? "",
-      role: shareLink.role,
+      permissionMode: shareLink.permissionMode,
       createdAt: file.createdAt,
-      url: file.publicUrl,
     },
   };
 }

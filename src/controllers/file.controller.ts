@@ -45,6 +45,25 @@ export class FileController {
     }
   }
 
+  static async previewFile(req: Request, res: Response): Promise<void> {
+    try {
+      const { stream, originalName, mimeType, size } =
+        await fileService.streamFileDownload(req.params.fileId, req.user!.id);
+
+      logAction(req, req.params.fileId, req.user!.id, "view", `Previewed ${originalName}`);
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(originalName)}"`);
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Content-Length", size);
+      stream.pipe(res);
+    } catch (error: any) {
+      const status =
+        error.message === "Access denied." ? 403
+        : error.message.includes("not found") ? 404
+        : 500;
+      res.status(status).json({ message: error.message });
+    }
+  }
+
   static async deleteFile(req: Request, res: Response): Promise<void> {
     try {
       const file = await fileService.deleteFile(req.params.fileId, req.user!.id);

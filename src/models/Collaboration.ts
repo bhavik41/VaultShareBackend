@@ -2,6 +2,7 @@ import { Schema, model } from 'mongoose'
 
 export type SharedRole = 'editor' | 'viewer'
 export type InvitationStatus = 'pending' | 'accepted' | 'rejected'
+export type ShareLinkPermissionMode = 'viewer' | 'editor' | 'download' | 'admin-download'
 
 export interface IInvitation {
   _id: string
@@ -30,7 +31,7 @@ export interface IShareLink {
   fileId: string
   ownerId: string
   token: string
-  role: SharedRole
+  permissionMode: ShareLinkPermissionMode
   expiresAt: Date
   revokedAt: Date | null
   createdAt: Date
@@ -68,7 +69,11 @@ const shareLinkSchema = new Schema<IShareLink>({
   fileId: { type: String, required: true, index: true },
   ownerId: { type: String, required: true },
   token: { type: String, required: true, unique: true, index: true },
-  role: { type: String, enum: ['editor', 'viewer'], required: true },
+  permissionMode: {
+    type: String,
+    enum: ['viewer', 'editor', 'download', 'admin-download'],
+    required: true,
+  },
   expiresAt: { type: Date, required: true },
   revokedAt: { type: Date, default: null },
   createdAt: { type: Date, default: () => new Date() },
