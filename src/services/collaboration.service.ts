@@ -84,8 +84,8 @@ export function validateShareLinkPermissionMode(
   );
 }
 
-function requireFileOwner(fileId: string, userId: string) {
-  const file = getFileById(fileId);
+async function requireFileOwner(fileId: string, userId: string) {
+  const file = await getFileById(fileId);
   if (!file) throw new Error("File not found.");
   if (file.userId !== userId) throw new Error("Access denied.");
   return file;
@@ -352,7 +352,7 @@ export async function listFilesSharedWithMe(userId: string): Promise<SharedFileR
 export async function createFileShareLink(input: CreateShareLinkInput): Promise<ShareLink> {
   const { fileId, ownerId } = input;
   const permissionMode = validateShareLinkPermissionMode(input.permissionMode);
-  const file = requireFileOwner(fileId, ownerId);
+  const file = await requireFileOwner(fileId, ownerId);
 
   const link = await createShareLink({
     id: uuidv4(),
