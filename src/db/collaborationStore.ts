@@ -13,6 +13,11 @@ import {
 export type InvitationStatus = "pending" | "accepted" | "rejected";
 export type CollaboratorRole = "owner" | "editor" | "viewer";
 export type SharedRole = Exclude<CollaboratorRole, "owner">;
+export type ShareLinkPermissionMode =
+  | "viewer"
+  | "editor"
+  | "download"
+  | "admin-download";
 
 export interface CollaborationInvitation {
   id: string;
@@ -41,7 +46,7 @@ export interface ShareLink {
   fileId: string;
   ownerId: string;
   token: string;
-  role: SharedRole;
+  permissionMode: ShareLinkPermissionMode;
   expiresAt: Date;
   revokedAt: Date | null;
   createdAt: Date;
