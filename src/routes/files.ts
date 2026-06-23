@@ -14,8 +14,14 @@ router.get("/", FileController.listFiles);
 
 router.get(
   "/:fileId/download",
-  requirePermission("view"),
+  requirePermission("download"),
   FileController.downloadFile,
+);
+
+router.get(
+  "/:fileId/preview",
+  requirePermission("view"),
+  FileController.previewFile,
 );
 
 router.get(
