@@ -65,7 +65,7 @@ export async function signup(data: SignupBody) {
   if (await findUserByEmail(email))
     throw new Error("An account with this email already exists.");
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, 10);
   const newUser = await createUser({
     id: uuidv4(),
     name: name.trim(),
@@ -171,7 +171,7 @@ export async function resetPassword(data: ResetPasswordBody) {
   if (user.resetOtp !== otp || user.resetOtpExpiry < new Date())
     throw new Error("Invalid or expired OTP.");
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const passwordHash = await bcrypt.hash(newPassword, 10);
   await updateUser(user.id, {
     passwordHash,
     resetOtp: null,
