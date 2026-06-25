@@ -1,4 +1,4 @@
-﻿import { Request, Response } from "express"
+import { Request, Response } from "express"
 import * as auditService from "../services/audit.service"
 import { AuditAction } from "../db/auditStore"
 import { getAuditLogsByDateRange } from "../db/auditStore"
@@ -70,7 +70,7 @@ export class AuditController {
   static async getAuditHistoryByDateRange(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params
-      const { from, to } = req.query
+      const { from, to, limit, offset } = req.query
       if (!from || !to) {
         res.status(400).json({ message: "from and to query params are required" })
         return
@@ -81,7 +81,12 @@ export class AuditController {
         res.status(400).json({ message: "Invalid date format" })
         return
       }
-      const logs = await getAuditLogsByDateRange(fileId, fromDate, toDate)
+      
+      const pagination: { limit?: number; offset?: number } = {}
+      if (limit && typeof limit === "string") pagination.limit = parseInt(limit, 10)
+      if (offset && typeof offset === "string") pagination.offset = parseInt(offset, 10)
+
+      const logs = await getAuditLogsByDateRange(fileId, fromDate, toDate, pagination)
       res.status(200).json({ logs })
     } catch (error: any) {
       res.status(500).json({ message: error.message })

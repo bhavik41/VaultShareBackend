@@ -1,4 +1,4 @@
-﻿import { v4 as uuidv4 } from "uuid"
+import { v4 as uuidv4 } from "uuid"
 import { AuditLogModel, IAuditLog, AuditAction } from "../models/AuditLog"
 
 export type { AuditAction }
@@ -65,9 +65,12 @@ export async function getAuditLogsByDateRange(
   fileId: string,
   from: Date,
   to: Date,
+  opts?: { limit?: number; offset?: number }
 ): Promise<AuditLog[]> {
   return AuditLogModel.find({ fileId, timestamp: { $gte: from, $lte: to } })
     .sort({ timestamp: -1 })
+    .skip(opts?.offset ?? 0)
+    .limit(opts?.limit ?? 50)
     .lean()
 }
 
