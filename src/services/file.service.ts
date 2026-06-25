@@ -14,10 +14,20 @@ export interface UploadResult {
   file: StoredFile;
 }
 
+const MAX_USER_STORAGE_BYTES = 1 * 1024 * 1024 * 1024; // 1 GB
+
 export async function uploadFile(
   userId: string,
   multerFile: Express.Multer.File,
 ): Promise<UploadResult> {
+  // #62 - Per-user storage quota to prevent disk exhaustion
+  const existingFiles = await getFilesByUser(userId);
+  const totalBytes = existingFiles.reduce((acc, f) => acc + f.size, 0);
+  if (totalBytes + multerFile.size > MAX_USER_STORAGE_BYTES) {
+    if (fs.existsSync(multerFile.path)) fs.unlinkSync(multerFile.path);
+    throw new Error("Storage quota exceeded (1GB limit).");
+  }
+
   const fileId = uuidv4();
   const stored = await createFile({
     id: fileId,
