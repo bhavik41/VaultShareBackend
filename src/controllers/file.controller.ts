@@ -2,6 +2,11 @@ import { Request, Response } from "express";
 import * as fileService from "../services/file.service";
 import { logAction } from "../utils/auditLogger";
 
+/** #41 — Strip \r and \n to prevent Content-Disposition header injection */
+function sanitizeFilename(name: string): string {
+  return name.replace(/[\r\n"/\\]/g, "_");
+}
+
 export class FileController {
   static async listFiles(req: Request, res: Response): Promise<void> {
     try {
@@ -33,7 +38,8 @@ export class FileController {
         req.user!.id,
       );
       logAction(req, file.id, req.user!.id, "download", `Downloaded ${file.originalName}`);
-      res.setHeader("Content-Disposition", `attachment; filename="${file.originalName}"`);
+      const safeFilename = sanitizeFilename(file.originalName);
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
       res.setHeader("Content-Type", file.mimeType);
       stream.pipe(res);
     } catch (error: any) {
@@ -51,7 +57,8 @@ export class FileController {
         await fileService.streamFileDownload(req.params.fileId, req.user!.id);
 
       logAction(req, req.params.fileId, req.user!.id, "view", `Previewed ${originalName}`);
-      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(originalName)}"`);
+      const safeFilename = sanitizeFilename(originalName);
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(safeFilename)}"`);
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Content-Length", size);
       stream.pipe(res);

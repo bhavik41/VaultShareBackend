@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { FileController } from "../controllers/file.controller";
 import { authenticate } from "../middleware/auth";
-import { upload } from "../middleware/upload";
+import { upload, validateMagicBytes } from "../middleware/upload";
 import { requirePermission } from "../middleware/permissions";
 
 const router = Router();
 
 router.use(authenticate);
 
-router.post("/upload", upload.single("file"), FileController.uploadFile);
+router.post("/upload", upload.single("file"), validateMagicBytes, FileController.uploadFile);
 
 router.get("/", FileController.listFiles);
 

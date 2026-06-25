@@ -1,7 +1,9 @@
 import { Server as HttpServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, Socket } from "socket.io";
+import jwt from "jsonwebtoken";
 import { registerChatHandlers } from "./chatHandlers";
 import { disconnectFromAllRooms, getOnlineUsers } from "./roomManager";
+import { UserPayload } from "../types/index";
 
 let io: SocketIOServer | null = null;
 
@@ -13,8 +15,35 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
     },
   });
 
+  // #23 — JWT authentication on Socket.IO connection handshake
+  io.use((socket: Socket, next) => {
+    const token =
+      (socket.handshake.auth?.token as string | undefined) ??
+      (socket.handshake.headers?.authorization as string | undefined)?.replace(
+        /^Bearer\s+/i,
+        "",
+      );
+
+    if (!token) {
+      return next(new Error("Authentication error: no token provided"));
+    }
+
+    try {
+      const secret = process.env.JWT_SECRET;
+      if (!secret) return next(new Error("Server configuration error"));
+      const decoded = jwt.verify(token, secret) as UserPayload;
+      // #24 — store verified identity in socket.data so handlers never trust client-supplied userId
+      socket.data.user = decoded;
+      next();
+    } catch {
+      next(new Error("Authentication error: invalid or expired token"));
+    }
+  });
+
   io.on("connection", (socket) => {
-    console.log(`[socket.io] client connected: ${socket.id}`);
+    console.log(
+      `[socket.io] client connected: ${socket.id} (user: ${socket.data.user?.id})`,
+    );
 
     // Register all chat-related event handlers
     registerChatHandlers(io!, socket);

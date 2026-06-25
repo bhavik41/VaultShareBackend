@@ -11,6 +11,9 @@ export interface IUser {
   twoFactorEnabled: boolean
   resetOtp: string | null
   resetOtpExpiry: Date | null
+  // Account lockout (#5)
+  failedLoginAttempts: number
+  lockoutUntil: Date | null
 }
 
 const userSchema = new Schema<IUser>({
@@ -24,6 +27,9 @@ const userSchema = new Schema<IUser>({
   twoFactorEnabled: { type: Boolean, default: false },
   resetOtp: { type: String, default: null },
   resetOtpExpiry: { type: Date, default: null },
+  // Account lockout (#5)
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockoutUntil: { type: Date, default: null },
 })
 
 export const UserModel = model<IUser>('User', userSchema)

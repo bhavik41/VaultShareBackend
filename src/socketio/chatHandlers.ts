@@ -28,14 +28,27 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
+  // #24 — Always derive identity from the JWT verified in socket.data.user
+  // Client-supplied userId / userName are never trusted for authorization purposes.
+  const authedUser = socket.data.user as { id: string; name: string; email?: string } | undefined;
+
   // ── join_room ────────────────────────────────────────────────────────────────
   socket.on("join_room", async (payload: JoinRoomPayload) => {
-    const { fileId, userId, userName } = payload ?? {};
+    const { fileId } = payload ?? {};
 
-    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId) || !isNonEmptyString(userName)) {
-      socket.emit("error", { message: "join_room: fileId, userId and userName are required" });
+    if (!isNonEmptyString(fileId)) {
+      socket.emit("error", { message: "join_room: fileId is required" });
       return;
     }
+
+    if (!authedUser) {
+      socket.emit("error", { message: "Unauthorized" });
+      return;
+    }
+
+    // #24 — Use server-verified identity, not client-provided values
+    const userId = authedUser.id;
+    const userName = authedUser.name;
 
     const onlineUser: OnlineUser = { userId, userName, socketId: socket.id };
     joinRoom(fileId, onlineUser);
@@ -67,18 +80,25 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── leave_room ───────────────────────────────────────────────────────────────
   socket.on("leave_room", (payload: LeaveRoomPayload) => {
-    const { fileId, userId } = payload ?? {};
+    const { fileId } = payload ?? {};
 
-    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId)) {
-      socket.emit("error", { message: "leave_room: fileId and userId are required" });
+    if (!isNonEmptyString(fileId)) {
+      socket.emit("error", { message: "leave_room: fileId is required" });
       return;
     }
+
+    if (!authedUser) {
+      socket.emit("error", { message: "Unauthorized" });
+      return;
+    }
+
+    const userId = authedUser.id;
 
     const removed = leaveRoom(fileId, socket.id);
     socket.leave(fileId);
 
     const onlineUsers = getOnlineUsers(fileId);
-    const userName = removed?.userName ?? userId;
+    const userName = removed?.userName ?? authedUser.name;
     io.to(fileId).emit("user_left", { userId, userName, onlineUsers });
 
     console.log(`[chat] ${userName} (${userId}) left room ${fileId}`);
@@ -86,10 +106,15 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── send_message ─────────────────────────────────────────────────────────────
   socket.on("send_message", async (payload: SendMessagePayload) => {
-    const { fileId, userId, userName, userEmail, content } = payload ?? {};
+    const { fileId, userEmail, content } = payload ?? {};
 
-    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId) || !isNonEmptyString(userName)) {
-      socket.emit("error", { message: "send_message: fileId, userId and userName are required" });
+    if (!isNonEmptyString(fileId)) {
+      socket.emit("error", { message: "send_message: fileId is required" });
+      return;
+    }
+
+    if (!authedUser) {
+      socket.emit("error", { message: "Unauthorized" });
       return;
     }
 
@@ -99,6 +124,10 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
       });
       return;
     }
+
+    // #24 — Use server-verified identity
+    const userId = authedUser.id;
+    const userName = authedUser.name;
 
     // Enforce admin-only chat: when enabled, only the file owner may send.
     const file = await getFileById(fileId);
@@ -115,7 +144,6 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
     io.to(fileId).emit("message_received", message);
 
     // Log the chat message send event to the audit service.
-    // We use "share" as the closest semantic AuditAction for a collaboration event.
     auditService.logAction(fileId, userId, "share", `chat: ${content.slice(0, 100)}`);
 
     console.log(`[chat] message in room ${fileId} from ${userName}`);
@@ -125,12 +153,20 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
   // Only the file owner may toggle admin-only chat. The new state is persisted
   // and broadcast to everyone in the room so all clients update their UI.
   socket.on("set_admin_only", async (payload: SetAdminOnlyPayload) => {
-    const { fileId, userId, adminOnly } = payload ?? {};
+    const { fileId, adminOnly } = payload ?? {};
 
-    if (!isNonEmptyString(fileId) || !isNonEmptyString(userId)) {
-      socket.emit("error", { message: "set_admin_only: fileId and userId are required" });
+    if (!isNonEmptyString(fileId)) {
+      socket.emit("error", { message: "set_admin_only: fileId is required" });
       return;
     }
+
+    if (!authedUser) {
+      socket.emit("error", { message: "Unauthorized" });
+      return;
+    }
+
+    // #24 — Use server-verified identity for authorization
+    const userId = authedUser.id;
 
     const file = await getFileById(fileId);
     if (!file) {
@@ -157,9 +193,12 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── typing ───────────────────────────────────────────────────────────────────
   socket.on("typing", (payload: TypingPayload) => {
-    const { fileId, userId, userName } = payload;
+    const { fileId } = payload;
 
-    if (!fileId || !userId || !userName) return;
+    if (!fileId || !authedUser) return;
+
+    const userId = authedUser.id;
+    const userName = authedUser.name;
 
     setTyping(fileId, userId, userName, (fId, uId, uName) => {
       // Auto-expire: broadcast stop to others in the room
@@ -171,10 +210,11 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── stop_typing ──────────────────────────────────────────────────────────────
   socket.on("stop_typing", (payload: StopTypingPayload) => {
-    const { fileId, userId } = payload;
+    const { fileId } = payload;
 
-    if (!fileId || !userId) return;
+    if (!fileId || !authedUser) return;
 
+    const userId = authedUser.id;
     const cleared = clearTyping(fileId, userId);
     if (cleared) {
       socket.to(fileId).emit("typing_indicator", {

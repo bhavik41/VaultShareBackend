@@ -17,6 +17,9 @@ export interface StoredUser {
   // Password reset
   resetOtp: string | null
   resetOtpExpiry: Date | null
+  // Account lockout (#5)
+  failedLoginAttempts: number
+  lockoutUntil: Date | null
 }
 
 function toStoredUser(doc: IUser): StoredUser {
@@ -31,6 +34,8 @@ function toStoredUser(doc: IUser): StoredUser {
     twoFactorEnabled: doc.twoFactorEnabled,
     resetOtp: doc.resetOtp,
     resetOtpExpiry: doc.resetOtpExpiry,
+    failedLoginAttempts: doc.failedLoginAttempts ?? 0,
+    lockoutUntil: doc.lockoutUntil ?? null,
   }
 }
 

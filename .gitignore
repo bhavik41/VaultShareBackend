@@ -4,3 +4,5 @@ dist/
 *.js.map
 gcp-service-account.json
 vaultshare-*.json
+# #39 — Uploaded user files must never be committed
+uploads/

@@ -129,13 +129,11 @@ export class AuthController {
         return;
       }
 
-      const { otp } = await authService.forgotPassword(email);
+      await authService.forgotPassword(email);
 
+      // #18 — Always return the same generic response (no email enumeration)
       res.status(200).json({
         message: "If that email exists, an OTP has been sent.",
-        ...(process.env.NODE_ENV !== "production" && otp
-          ? { devOtp: otp }
-          : {}),
       });
     } catch (error: any) {
       res.status(400).json({ message: error.message });

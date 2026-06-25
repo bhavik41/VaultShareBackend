@@ -11,6 +11,10 @@ import {
   createUser,
   updateUser,
 } from "../db/inMemoryStore";
+
+// Account lockout constants (#5)
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 import type {
   SignupBody,
   SigninBody,
@@ -20,11 +24,22 @@ import type {
 } from "../types/index";
 import { sendPasswordResetEmail } from "../utils/email";
 
-const JWT_SECRET = () => process.env.JWT_SECRET as string;
-const REFRESH_SECRET = () =>
-  (process.env.REFRESH_SECRET ?? process.env.JWT_SECRET) as string;
-const TEMP_SECRET = () =>
-  (process.env.TEMP_SECRET ?? process.env.JWT_SECRET) as string;
+const JWT_SECRET = () => {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error("JWT_SECRET is not set");
+  return s;
+};
+// #11 — REFRESH_SECRET and TEMP_SECRET must be set explicitly; no fallback to JWT_SECRET
+const REFRESH_SECRET = () => {
+  const s = process.env.REFRESH_SECRET;
+  if (!s) throw new Error("REFRESH_SECRET is not set");
+  return s;
+};
+const TEMP_SECRET = () => {
+  const s = process.env.TEMP_SECRET;
+  if (!s) throw new Error("TEMP_SECRET is not set");
+  return s;
+};
 
 export function issueAccessToken(payload: UserPayload): string {
   return jwt.sign(payload, JWT_SECRET(), { expiresIn: "15m" });
@@ -56,8 +71,9 @@ export async function getMe(userId: string) {
 
 export async function signup(data: SignupBody) {
   const { name, email, password } = data;
-  if (password.length < 6)
-    throw new Error("Password must be at least 6 characters.");
+  // #14 — minimum password length raised to 8
+  if (password.length < 8)
+    throw new Error("Password must be at least 8 characters.");
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) throw new Error("Invalid email address.");
@@ -65,7 +81,8 @@ export async function signup(data: SignupBody) {
   if (await findUserByEmail(email))
     throw new Error("An account with this email already exists.");
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  // #13 — bcrypt cost raised to 12
+  const passwordHash = await bcrypt.hash(password, 12);
   const newUser = await createUser({
     id: uuidv4(),
     name: name.trim(),
@@ -77,6 +94,8 @@ export async function signup(data: SignupBody) {
     twoFactorEnabled: false,
     resetOtp: null,
     resetOtpExpiry: null,
+    failedLoginAttempts: 0,
+    lockoutUntil: null,
   });
 
   const userPayload: UserPayload = {
@@ -96,9 +115,39 @@ export async function signup(data: SignupBody) {
 export async function signin(data: SigninBody) {
   const { email, password } = data;
   const user = await findUserByEmail(email);
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+
+  // #5 — Account lockout: check lockout before verifying password
+  if (user) {
+    const now = new Date();
+    if (
+      user.lockoutUntil &&
+      user.lockoutUntil > now
+    ) {
+      const remaining = Math.ceil((user.lockoutUntil.getTime() - now.getTime()) / 60000);
+      throw new Error(`Account locked. Try again in ${remaining} minute(s).`);
+    }
+  }
+
+  const passwordMatch = user ? await bcrypt.compare(password, user.passwordHash) : false;
+
+  if (!user || !passwordMatch) {
+    // Increment failed attempt counter
+    if (user) {
+      const attempts = (user.failedLoginAttempts ?? 0) + 1;
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        await updateUser(user.id, {
+          failedLoginAttempts: 0,
+          lockoutUntil: new Date(Date.now() + LOCKOUT_DURATION_MS),
+        });
+        throw new Error(`Account locked after too many failed attempts. Try again in 15 minutes.`);
+      }
+      await updateUser(user.id, { failedLoginAttempts: attempts });
+    }
     throw new Error("Invalid email or password.");
   }
+
+  // Reset failed counter on successful password match
+  await updateUser(user.id, { failedLoginAttempts: 0, lockoutUntil: null });
 
   if (user.twoFactorEnabled) {
     const tempToken = issueTempToken({ id: user.id, requires2fa: true });
@@ -150,33 +199,40 @@ export async function logout(userId: string) {
 
 export async function forgotPassword(email: string) {
   const user = await findUserByEmail(email);
-  if (!user) return { otp: null }; // Return generic success later to avoid enum
+  // #18 — always return the same response regardless of whether email exists
+  if (!user) return;
 
   const otp = generateOtp();
+  // #16 — hash the OTP before storing; plaintext OTP is only emailed, never stored
+  const otpHash = await bcrypt.hash(otp, 10);
   const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-  await updateUser(user.id, { resetOtp: otp, resetOtpExpiry: expiry });
+  await updateUser(user.id, { resetOtp: otpHash, resetOtpExpiry: expiry });
 
   await sendPasswordResetEmail(user.email, otp);
-  return { otp };
 }
 
 export async function resetPassword(data: ResetPasswordBody) {
   const { email, otp, newPassword } = data;
-  if (newPassword.length < 6)
-    throw new Error("Password must be at least 6 characters.");
+  // #14 — minimum password length 8
+  if (newPassword.length < 8)
+    throw new Error("Password must be at least 8 characters.");
 
   const user = await findUserByEmail(email);
   if (!user || !user.resetOtp || !user.resetOtpExpiry)
     throw new Error("Invalid or expired OTP.");
-  if (user.resetOtp !== otp || user.resetOtpExpiry < new Date())
+
+  // #16 — compare OTP against bcrypt hash
+  const otpValid = await bcrypt.compare(otp, user.resetOtp);
+  if (!otpValid || user.resetOtpExpiry < new Date())
     throw new Error("Invalid or expired OTP.");
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  // #13 — bcrypt cost 12
+  const passwordHash = await bcrypt.hash(newPassword, 12);
   await updateUser(user.id, {
     passwordHash,
     resetOtp: null,
     resetOtpExpiry: null,
-    refreshToken: null, // invalidate sessions
+    refreshToken: null, // invalidate sessions (#10)
   });
 }
 

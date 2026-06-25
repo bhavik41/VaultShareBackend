@@ -35,3 +35,33 @@ export const sendPasswordResetEmail = async (to: string, otp: string): Promise<v
     text: `Your one-time password reset code is: ${otp}\n\nThis code expires in 10 minutes.`,
   })
 }
+
+export const sendGroupAccessEmail = async (
+  to: string,
+  groupName: string,
+  fileName: string,
+  sharerName: string,
+  role: string,
+): Promise<void> => {
+  await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `VaultShare — New file shared in group "${groupName}"`,
+    text: `${sharerName} has shared the file "${fileName}" with the group "${groupName}".\n\nYour access level: ${role}.\n\nSign in to VaultShare to view the file.`,
+  })
+}
+
+export const sendFileSharedEmail = async (
+  to: string,
+  fileName: string,
+  sharerName: string,
+  role: string,
+): Promise<void> => {
+  await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `VaultShare — "${fileName}" has been shared with you`,
+    text: `${sharerName} has shared the file "${fileName}" with you.\n\nYour access level: ${role}.\n\nSign in to VaultShare to view the file.`,
+  })
+}
+

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import authRouter from "./routes/auth";
 import filesRouter from "./routes/files";
 import collaborationRouter from "./routes/collaboration";
@@ -11,6 +12,9 @@ import chatRouter from "./routes/chat";
 import groupsRouter from "./routes/groups";
 
 const app = express()
+
+// #43-48 — helmet sets X-Content-Type-Options, X-Frame-Options, CSP, HSTS, Referrer-Policy, etc.
+app.use(helmet())
 
 const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173").split(",").map((s) => s.trim())
 app.use(cors({ origin: allowedOrigins, credentials: true }))
