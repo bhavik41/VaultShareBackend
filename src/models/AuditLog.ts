@@ -1,4 +1,4 @@
-﻿import { Schema, model } from "mongoose"
+import { Schema, model } from "mongoose"
 
 export type AuditAction =
   | "upload"
@@ -40,7 +40,12 @@ const auditLogSchema = new Schema<IAuditLog>({
   ipAddress: { type: String },
   userAgent: { type: String },
   metadata: { type: Schema.Types.Mixed },
-  timestamp: { type: Date, default: () => new Date(), index: true },
+  timestamp: { 
+    type: Date, 
+    default: () => new Date(), 
+    index: true,
+    expires: "90d" // #68 - Auto-delete logs older than 90 days to prevent unbounded DB growth
+  },
 })
 
 // Compound indexes for fast per-file and per-user time-range queries
