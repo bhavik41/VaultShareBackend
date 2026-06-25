@@ -8,10 +8,12 @@ import auditRoutes, { activityRouter } from "./routes/audit";
 import starredRoutes from "./routes/starred";
 import activityRoutes from "./routes/activity";
 import chatRouter from "./routes/chat";
+import groupsRouter from "./routes/groups";
 
 const app = express()
 
-app.use(cors({ origin: process.env.CLIENT_URL ?? "http://localhost:5173", credentials: true }))
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173").split(",").map((s) => s.trim())
+app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.use(express.json())
 
 // Request logger – helps correlate audit log timestamps during debugging
@@ -30,5 +32,6 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/starred", starredRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/chat", chatRouter);
+app.use("/api/groups", groupsRouter);
 
 export default app
