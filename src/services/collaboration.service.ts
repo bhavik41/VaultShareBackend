@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { v4 as uuidv4 } from "../utils/uuid";
-import { getFileById } from "../db/fileStore";
-import { findUserByEmail, findUserById } from "../db/inMemoryStore";
+import { getFileById, getFilesByIds } from "../db/fileStore";
+import { findUserByEmail, findUserById, findUsersByIds } from "../db/inMemoryStore";
 import * as fileService from "./file.service";
 import {
   CollaborationInvitation,
@@ -156,21 +156,32 @@ export async function inviteCollaborator(
   return invitation;
 }
 
-export async function listMyInvitations(userId: string) {
-  const invitations = await getInvitationsForUser(userId);
-  return Promise.all(
-    invitations.map(async (invitation) => {
-      const file = await getFileById(invitation.fileId);
-      const inviter = await findUserById(invitation.inviterId);
+export async function listMyInvitations(userId: string, limit: number = 50, offset: number = 0) {
+  const invitations = await getInvitationsForUser(userId, limit, offset);
+  
+  // #64, #67 - Bulk lookups to prevent N+1 queries
+  const fileIds = [...new Set(invitations.map(i => i.fileId))];
+  const inviterIds = [...new Set(invitations.map(i => i.inviterId))];
+  
+  const [files, inviters] = await Promise.all([
+    getFilesByIds(fileIds),
+    findUsersByIds(inviterIds)
+  ]);
+  
+  const fileMap = new Map(files.map(f => [f.id, f]));
+  const inviterMap = new Map(inviters.map(u => [u.id, u]));
 
-      return {
-        ...invitation,
-        fileName: file?.originalName ?? "Unknown file",
-        inviterName: inviter?.name ?? "Unknown user",
-        inviterEmail: inviter?.email ?? "",
-      };
-    }),
-  );
+  return invitations.map((invitation) => {
+    const file = fileMap.get(invitation.fileId);
+    const inviter = inviterMap.get(invitation.inviterId);
+
+    return {
+      ...invitation,
+      fileName: file?.originalName ?? "Unknown file",
+      inviterName: inviter?.name ?? "Unknown user",
+      inviterEmail: inviter?.email ?? "",
+    };
+  });
 }
 
 export async function listFileInvitations(fileId: string, ownerId: string) {
@@ -267,26 +278,30 @@ export async function shareFileWithUser(input: ShareFileInput): Promise<FileShar
   return share;
 }
 
-export async function listSharedUsers(fileId: string, ownerId: string) {
+export async function listSharedUsers(fileId: string, ownerId: string, limit: number = 50, offset: number = 0) {
   const file = await requireFileOwner(fileId, ownerId);
 
-  const shares = await getSharesByFile(file.id);
-  return Promise.all(
-    shares.map(async (share) => {
-      const user = await findUserById(share.userId);
+  const shares = await getSharesByFile(file.id, limit, offset);
+  
+  // #65, #67 - Bulk lookups to prevent N+1 queries
+  const userIds = [...new Set(shares.map(s => s.userId))];
+  const users = await findUsersByIds(userIds);
+  const userMap = new Map(users.map(u => [u.id, u]));
 
-      return {
-        id: share.id,
-        fileId: share.fileId,
-        userId: share.userId,
-        name: user?.name ?? "Unknown user",
-        email: user?.email ?? "",
-        role: share.role,
-        createdAt: share.createdAt,
-        updatedAt: share.updatedAt,
-      };
-    }),
-  );
+  return shares.map((share) => {
+    const user = userMap.get(share.userId);
+
+    return {
+      id: share.id,
+      fileId: share.fileId,
+      userId: share.userId,
+      name: user?.name ?? "Unknown user",
+      email: user?.email ?? "",
+      role: share.role,
+      createdAt: share.createdAt,
+      updatedAt: share.updatedAt,
+    };
+  });
 }
 
 export async function updateCollaboratorPermission(
@@ -323,29 +338,41 @@ export async function removeCollaborator(
   auditService.logAction(fileId, ownerId, "revoke_access", `Removed collaborator ${collaboratorId}`);
 }
 
-export async function listFilesSharedWithMe(userId: string): Promise<SharedFileResult[]> {
-  const shares = await getSharesByUser(userId);
-  const resolved = await Promise.all(
-    shares.map(async (share) => {
-      const file = await getFileById(share.fileId);
-      if (!file) return null;
+export async function listFilesSharedWithMe(userId: string, limit: number = 50, offset: number = 0): Promise<SharedFileResult[]> {
+  const shares = await getSharesByUser(userId, limit, offset);
+  
+  // #66, #67 - Bulk lookups to prevent N+1 queries
+  const fileIds = [...new Set(shares.map(s => s.fileId))];
+  const ownerIds = [...new Set(shares.map(s => s.ownerId))];
+  
+  const [files, owners] = await Promise.all([
+    getFilesByIds(fileIds),
+    findUsersByIds(ownerIds)
+  ]);
+  
+  const fileMap = new Map(files.map(f => [f.id, f]));
+  const ownerMap = new Map(owners.map(u => [u.id, u]));
 
-      const owner = await findUserById(share.ownerId);
+  const resolved = shares.map((share) => {
+    const file = fileMap.get(share.fileId);
+    if (!file) return null;
 
-      return {
-        id: file.id,
-        name: file.originalName,
-        mimeType: file.mimeType,
-        size: file.size,
-        ownerId: share.ownerId,
-        ownerName: owner?.name ?? "Unknown user",
-        ownerEmail: owner?.email ?? "",
-        role: share.role,
-        createdAt: file.createdAt,
-        sharedAt: share.createdAt,
-      };
-    }),
-  );
+    const owner = ownerMap.get(share.ownerId);
+
+    return {
+      id: file.id,
+      name: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      ownerId: share.ownerId,
+      ownerName: owner?.name ?? "Unknown user",
+      ownerEmail: owner?.email ?? "",
+      role: share.role,
+      createdAt: file.createdAt,
+      sharedAt: share.createdAt,
+    };
+  });
+  
   return resolved.filter((file): file is SharedFileResult => file !== null);
 }
 

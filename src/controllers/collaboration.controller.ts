@@ -49,7 +49,9 @@ export class CollaborationController {
 
   static async listMyInvitations(req: Request, res: Response): Promise<void> {
     try {
-      const invitations = await collaborationService.listMyInvitations(req.user!.id);
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const invitations = await collaborationService.listMyInvitations(req.user!.id, limit, offset);
       res.status(200).json({ invitations });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -127,9 +129,13 @@ export class CollaborationController {
   static async listSharedUsers(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
       const collaborators = await collaborationService.listSharedUsers(
         fileId,
         req.user!.id,
+        limit,
+        offset
       );
 
       res.status(200).json({ collaborators });
@@ -186,7 +192,9 @@ export class CollaborationController {
 
   static async listFilesSharedWithMe(req: Request, res: Response): Promise<void> {
     try {
-      const files = await collaborationService.listFilesSharedWithMe(req.user!.id);
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const files = await collaborationService.listFilesSharedWithMe(req.user!.id, limit, offset);
       res.status(200).json({ files });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

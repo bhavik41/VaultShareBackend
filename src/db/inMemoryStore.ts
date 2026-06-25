@@ -49,6 +49,11 @@ export const findUserById = async (id: string): Promise<StoredUser | undefined> 
   return doc ? toStoredUser(doc) : undefined
 }
 
+export const findUsersByIds = async (ids: string[]): Promise<StoredUser[]> => {
+  const docs = await UserModel.find({ _id: { $in: ids } }).lean()
+  return docs.map(toStoredUser)
+}
+
 export const findUserByRefreshToken = async (token: string): Promise<StoredUser | undefined> => {
   const doc = await UserModel.findOne({ refreshToken: token }).lean()
   return doc ? toStoredUser(doc) : undefined
