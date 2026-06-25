@@ -8,6 +8,10 @@ const PORT = parseInt(process.env.PORT ?? "5000", 10);
 
 const httpServer = http.createServer(app);
 
+// #70, #71 - Prevent Slowloris attacks by closing slow/idle connections
+httpServer.requestTimeout = 30000;
+httpServer.timeout = 120000;
+
 // Attach Socket.IO to the HTTP server
 initSocketIO(httpServer);
 
