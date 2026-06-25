@@ -52,6 +52,8 @@ export function setTyping(
   onExpire: (fileId: string, userId: string, userName: string) => void,
 ): void {
   if (!typingState.has(fileId)) {
+    // #58 - Cap total rooms with active typing state to prevent memory exhaustion
+    if (typingState.size >= 1000) return;
     typingState.set(fileId, new Map());
   }
   const roomTyping = typingState.get(fileId)!;
@@ -59,6 +61,9 @@ export function setTyping(
   // Clear existing timer for this user if present
   if (roomTyping.has(userId)) {
     clearTimeout(roomTyping.get(userId)!.timerId);
+  } else {
+    // #58 - Cap typing users per room
+    if (roomTyping.size >= 50) return;
   }
 
   const timerId = setTimeout(() => {
