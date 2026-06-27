@@ -34,6 +34,12 @@ export function registerChatHandlers(io: SocketIOServer, socket: Socket): void {
 
   // ── join_room ────────────────────────────────────────────────────────────────
   socket.on("join_room", async (payload: JoinRoomPayload) => {
+    // #60 - Limit rooms a single socket can join to prevent memory exhaustion
+    if (socket.rooms.size >= 100) {
+      socket.emit("error", { message: "Maximum room limit reached" });
+      return;
+    }
+
     const { fileId } = payload ?? {};
 
     if (!isNonEmptyString(fileId)) {

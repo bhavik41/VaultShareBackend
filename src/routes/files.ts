@@ -3,12 +3,13 @@ import { FileController } from "../controllers/file.controller";
 import { authenticate } from "../middleware/auth";
 import { upload, validateMagicBytes } from "../middleware/upload";
 import { requirePermission } from "../middleware/permissions";
+import { uploadThrottle } from "../middleware/uploadThrottle";
 
 const router = Router();
 
 router.use(authenticate);
 
-router.post("/upload", upload.single("file"), validateMagicBytes, FileController.uploadFile);
+router.post("/upload", uploadThrottle, upload.single("file"), validateMagicBytes, FileController.uploadFile);
 
 router.get("/", FileController.listFiles);
 

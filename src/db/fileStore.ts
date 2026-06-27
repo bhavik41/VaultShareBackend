@@ -51,6 +51,11 @@ export const getFileById = async (id: string): Promise<StoredFile | undefined> =
   return doc ? toStoredFile(doc) : undefined;
 };
 
+export const getFilesByIds = async (ids: string[]): Promise<StoredFile[]> => {
+  const docs = await FileModel.find({ _id: { $in: ids } }).lean();
+  return docs.map(toStoredFile);
+};
+
 export const getFilesByUser = async (userId: string): Promise<StoredFile[]> => {
   const docs = await FileModel.find({ userId }).sort({ createdAt: -1 }).lean();
   return docs.map(toStoredFile);

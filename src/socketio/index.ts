@@ -15,6 +15,26 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
     },
   });
 
+  // #61 — Rate limit Socket.IO connections per IP
+  const connectionLimit = new Map<string, { count: number; resetTime: number }>();
+  io.use((socket: Socket, next) => {
+    const ip = socket.handshake.address;
+    const now = Date.now();
+    let record = connectionLimit.get(ip);
+    
+    // 1-minute window, max 20 connections per IP
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + 60000 };
+    } else {
+      record.count++;
+      if (record.count > 20) {
+        return next(new Error("Rate limit exceeded. Try again later."));
+      }
+    }
+    connectionLimit.set(ip, record);
+    next();
+  });
+
   // #23 — JWT authentication on Socket.IO connection handshake
   io.use((socket: Socket, next) => {
     const token =

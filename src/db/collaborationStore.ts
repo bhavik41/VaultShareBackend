@@ -121,8 +121,13 @@ export const getInvitationById = async (
 
 export const getInvitationsForUser = async (
   userId: string,
+  limit: number = 50,
+  offset: number = 0
 ): Promise<CollaborationInvitation[]> => {
-  const docs = await InvitationModel.find({ inviteeId: userId }).lean();
+  const docs = await InvitationModel.find({ inviteeId: userId })
+    .skip(offset)
+    .limit(limit)
+    .lean();
   return docs.map(toInvitation);
 };
 
@@ -176,13 +181,27 @@ export const getFileShare = async (
   return doc ? toFileShare(doc) : undefined;
 };
 
-export const getSharesByFile = async (fileId: string): Promise<FileShare[]> => {
-  const docs = await FileShareModel.find({ fileId }).lean();
+export const getSharesByFile = async (
+  fileId: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<FileShare[]> => {
+  const docs = await FileShareModel.find({ fileId })
+    .skip(offset)
+    .limit(limit)
+    .lean();
   return docs.map(toFileShare);
 };
 
-export const getSharesByUser = async (userId: string): Promise<FileShare[]> => {
-  const docs = await FileShareModel.find({ userId }).lean();
+export const getSharesByUser = async (
+  userId: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<FileShare[]> => {
+  const docs = await FileShareModel.find({ userId })
+    .skip(offset)
+    .limit(limit)
+    .lean();
   return docs.map(toFileShare);
 };
 

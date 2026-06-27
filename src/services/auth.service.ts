@@ -24,33 +24,26 @@ import type {
 } from "../types/index";
 import { sendPasswordResetEmail } from "../utils/email";
 
-const JWT_SECRET = () => {
-  const s = process.env.JWT_SECRET;
-  if (!s) throw new Error("JWT_SECRET is not set");
-  return s;
-};
-// #11 — REFRESH_SECRET and TEMP_SECRET must be set explicitly; no fallback to JWT_SECRET
-const REFRESH_SECRET = () => {
-  const s = process.env.REFRESH_SECRET;
-  if (!s) throw new Error("REFRESH_SECRET is not set");
-  return s;
-};
-const TEMP_SECRET = () => {
-  const s = process.env.TEMP_SECRET;
-  if (!s) throw new Error("TEMP_SECRET is not set");
-  return s;
-};
+// #82, #83 — Fail fast at startup if required secrets are missing, no fallback chaining
+export const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) throw new Error("JWT_SECRET is not set in environment.");
+
+export const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
+if (!REFRESH_SECRET) throw new Error("REFRESH_SECRET is not set in environment.");
+
+export const TEMP_SECRET = process.env.TEMP_SECRET as string;
+if (!TEMP_SECRET) throw new Error("TEMP_SECRET is not set in environment.");
 
 export function issueAccessToken(payload: UserPayload): string {
-  return jwt.sign(payload, JWT_SECRET(), { expiresIn: "15m" });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
 }
 
 export function issueRefreshToken(payload: UserPayload): string {
-  return jwt.sign(payload, REFRESH_SECRET(), { expiresIn: "7d" });
+  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d" });
 }
 
 export function issueTempToken(payload: TempTokenPayload): string {
-  return jwt.sign(payload, TEMP_SECRET(), { expiresIn: "5m" });
+  return jwt.sign(payload, TEMP_SECRET, { expiresIn: "5m" });
 }
 
 function generateOtp(): string {
@@ -170,7 +163,7 @@ export async function signin(data: SigninBody) {
 export async function refresh(refreshToken: string) {
   let decoded: UserPayload;
   try {
-    decoded = jwt.verify(refreshToken, REFRESH_SECRET()) as UserPayload;
+    decoded = jwt.verify(refreshToken, REFRESH_SECRET) as UserPayload;
   } catch {
     throw new Error("Invalid or expired refresh token.");
   }
@@ -271,7 +264,7 @@ export async function verify2fa(userId: string, token: string) {
 export async function validate2fa(tempToken: string, token: string) {
   let decoded: TempTokenPayload;
   try {
-    decoded = jwt.verify(tempToken, TEMP_SECRET()) as TempTokenPayload;
+    decoded = jwt.verify(tempToken, TEMP_SECRET) as TempTokenPayload;
   } catch {
     throw new Error("Temp token invalid or expired.");
   }

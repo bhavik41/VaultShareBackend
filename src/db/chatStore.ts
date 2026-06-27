@@ -52,6 +52,12 @@ export function addOnlineUser(fileId: string, user: OnlineUser): void {
   const users = onlineUserStore.get(fileId) ?? [];
   // Avoid duplicates — remove any existing entry for this socket
   const filtered = users.filter((u) => u.socketId !== user.socketId);
+  // #59 - Cap onlineUserStore per room to prevent memory exhaustion
+  if (filtered.length >= 1000) {
+    // If room is full, just silently ignore the new connection state 
+    // to prevent botnet floods
+    return;
+  }
   filtered.push(user);
   onlineUserStore.set(fileId, filtered);
 }
