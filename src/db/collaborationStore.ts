@@ -50,6 +50,7 @@ export interface ShareLink {
   expiresAt: Date;
   revokedAt: Date | null;
   createdAt: Date;
+  passwordHash: string | null;
 }
 
 // ── Mappers ──────────────────────────────────────────────────────────────────
@@ -90,6 +91,7 @@ function toShareLink(doc: IShareLink): ShareLink {
     expiresAt: doc.expiresAt,
     revokedAt: doc.revokedAt,
     createdAt: doc.createdAt,
+    passwordHash: doc.passwordHash ?? null,
   };
 }
 
@@ -238,6 +240,7 @@ export const createShareLink = async (shareLink: ShareLink): Promise<ShareLink> 
     expiresAt: shareLink.expiresAt,
     revokedAt: shareLink.revokedAt,
     createdAt: shareLink.createdAt,
+    passwordHash: shareLink.passwordHash,
   });
   return toShareLink(doc.toObject());
 };

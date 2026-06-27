@@ -35,6 +35,7 @@ export interface IShareLink {
   expiresAt: Date
   revokedAt: Date | null
   createdAt: Date
+  passwordHash: string | null
 }
 
 const invitationSchema = new Schema<IInvitation>({
@@ -77,6 +78,7 @@ const shareLinkSchema = new Schema<IShareLink>({
   expiresAt: { type: Date, required: true },
   revokedAt: { type: Date, default: null },
   createdAt: { type: Date, default: () => new Date() },
+  passwordHash: { type: String, default: null },
 })
 
 export const InvitationModel = model<IInvitation>('Invitation', invitationSchema)

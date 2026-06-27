@@ -7,7 +7,9 @@ import { v4 as uuidv4 } from "uuid";
 // #31 — text/html removed (executes in browser)
 // #32 — image/svg+xml removed from allowlist (SVG can embed JS); serve separately as attachment only
 // #33 — application/octet-stream removed (catch-all that bypasses the allowlist)
+// application/vaultshare-encrypted is the internal sentinel for client-side AES-GCM encrypted uploads
 const ALLOWED_MIME_TYPES = new Set([
+  "application/vaultshare-encrypted",
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -127,8 +129,8 @@ export function validateMagicBytes(
     return;
   }
 
-  // Text-based formats: skip magic byte check
-  if (TEXT_BASED_MIMES.has(file.mimetype)) {
+  // Text-based formats and client-encrypted uploads: skip magic byte check
+  if (TEXT_BASED_MIMES.has(file.mimetype) || file.mimetype === "application/vaultshare-encrypted") {
     next();
     return;
   }

@@ -204,7 +204,7 @@ export class CollaborationController {
   static async createShareLink(req: Request, res: Response): Promise<void> {
     try {
       const { fileId } = req.params;
-      const { permissionMode, expiresAt } = req.body;
+      const { permissionMode, expiresAt, password } = req.body;
 
       if (!permissionMode) {
         res.status(400).json({ message: "permissionMode is required." });
@@ -216,6 +216,7 @@ export class CollaborationController {
         ownerId: req.user!.id,
         permissionMode,
         expiresAt,
+        password,
       });
 
       res.status(201).json({
@@ -380,6 +381,27 @@ export class CollaborationController {
       res.status(200).json({ message: "Access revoked successfully." });
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message });
+    }
+  }
+
+  static async unlockShareLink(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+      const { password } = req.body;
+
+      if (!password) {
+        res.status(400).json({ message: "password is required." });
+        return;
+      }
+
+      const unlockToken = await collaborationService.verifyShareLinkPassword(token, password);
+      res.status(200).json({ message: "Access granted.", unlockToken });
+    } catch (error: any) {
+      const status =
+        error.message === "Incorrect password." ? 401
+        : error.message === "Share link not found." ? 404
+        : 400;
+      res.status(status).json({ message: error.message });
     }
   }
 }
