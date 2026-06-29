@@ -15,6 +15,7 @@ router.get(
   CollaborationController.downloadShareLink,
 );
 router.get("/share-links/:token", validateShareLinkMiddleware, CollaborationController.validateShareLink);
+router.post("/share-links/:token/unlock", CollaborationController.unlockShareLink);
 
 router.use(authenticate);
 

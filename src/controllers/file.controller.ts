@@ -23,7 +23,9 @@ export class FileController {
         res.status(400).json({ message: "No file provided." });
         return;
       }
-      const { file } = await fileService.uploadFile(req.user!.id, req.file);
+      const isEncrypted = req.body.encrypted === "true";
+      const originalMimeType = typeof req.body.originalMimeType === "string" ? req.body.originalMimeType : undefined;
+      const { file } = await fileService.uploadFile(req.user!.id, req.file, { isEncrypted, originalMimeType });
       logAction(req, file.id, req.user!.id, "upload", `Uploaded ${file.originalName}`);
       res.status(201).json({ file });
     } catch (error: any) {

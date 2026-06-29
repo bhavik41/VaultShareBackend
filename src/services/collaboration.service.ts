@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "../utils/uuid";
 import { getFileById, getFilesByIds } from "../db/fileStore";
 import { findUserByEmail, findUserById, findUsersByIds } from "../db/inMemoryStore";
@@ -47,6 +49,7 @@ interface CreateShareLinkInput {
   ownerId: string;
   permissionMode: string;
   expiresAt?: string;
+  password?: string;
 }
 
 interface SharedFileResult {
@@ -381,6 +384,8 @@ export async function createFileShareLink(input: CreateShareLinkInput): Promise<
   const permissionMode = validateShareLinkPermissionMode(input.permissionMode);
   const file = await requireFileOwner(fileId, ownerId);
 
+  const passwordHash = input.password ? await bcrypt.hash(input.password, 12) : null;
+
   const link = await createShareLink({
     id: uuidv4(),
     fileId: file.id,
@@ -390,11 +395,27 @@ export async function createFileShareLink(input: CreateShareLinkInput): Promise<
     expiresAt: parseExpirationDate(input.expiresAt),
     revokedAt: null,
     createdAt: new Date(),
+    passwordHash,
   });
 
   auditService.logAction(file.id, ownerId, "share", `Created share link with permission mode ${permissionMode}`);
 
   return link;
+}
+
+export async function verifyShareLinkPassword(token: string, password: string): Promise<string> {
+  const shareLink = await getShareLinkByToken(token);
+  if (!shareLink) throw new Error("Share link not found.");
+  if (!shareLink.passwordHash) throw new Error("This share link is not password-protected.");
+
+  const valid = await bcrypt.compare(password, shareLink.passwordHash);
+  if (!valid) throw new Error("Incorrect password.");
+
+  return jwt.sign(
+    { shareToken: token, type: "share-unlock" },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "30m" },
+  );
 }
 
 export async function listFileShareLinks(fileId: string, ownerId: string): Promise<ShareLink[]> {
@@ -435,8 +456,11 @@ export async function validateShareLinkToken(token: string) {
 
   const owner = await findUserById(shareLink.ownerId);
 
+  // Never expose passwordHash to clients; replace with a boolean flag
+  const { passwordHash, ...shareLinkPublic } = shareLink;
+
   return {
-    shareLink,
+    shareLink: { ...shareLinkPublic, passwordProtected: passwordHash !== null },
     file: {
       id: file.id,
       name: file.originalName,
@@ -447,6 +471,7 @@ export async function validateShareLinkToken(token: string) {
       ownerEmail: owner?.email ?? "",
       permissionMode: shareLink.permissionMode,
       createdAt: file.createdAt,
+      isEncrypted: file.isEncrypted,
     },
   };
 }

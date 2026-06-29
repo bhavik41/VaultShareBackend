@@ -10,6 +10,7 @@ export interface IFile {
   publicUrl: string
   adminOnlyChat: boolean
   createdAt: Date
+  isEncrypted: boolean
 }
 
 const fileSchema = new Schema<IFile>({
@@ -22,6 +23,7 @@ const fileSchema = new Schema<IFile>({
   publicUrl: { type: String, required: true },
   adminOnlyChat: { type: Boolean, default: false },
   createdAt: { type: Date, default: () => new Date() },
+  isEncrypted: { type: Boolean, default: false },
 })
 
 export const FileModel = model<IFile>('File', fileSchema)

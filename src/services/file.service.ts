@@ -21,6 +21,7 @@ const MAX_USER_FILE_COUNT = 1000;
 export async function uploadFile(
   userId: string,
   multerFile: Express.Multer.File,
+  options: { isEncrypted?: boolean; originalMimeType?: string } = {},
 ): Promise<UploadResult> {
   const existingFiles = await getFilesByUser(userId);
   
@@ -42,12 +43,13 @@ export async function uploadFile(
     id: fileId,
     userId,
     originalName: multerFile.originalname,
-    mimeType: multerFile.mimetype,
+    mimeType: options.originalMimeType ?? multerFile.mimetype,
     size: multerFile.size,
     diskPath: multerFile.path,
     publicUrl: `/api/files/${fileId}/download`,
     adminOnlyChat: false,
     createdAt: new Date(),
+    isEncrypted: options.isEncrypted ?? false,
   });
 
   auditService.logAction(fileId, userId, "upload", `Uploaded file ${multerFile.originalname}`);

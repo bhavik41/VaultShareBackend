@@ -60,7 +60,30 @@ export function requireShareLinkDownloadPermission(
     return;
   }
 
-  const { shareLink } = validation;
+  const { shareLink } = validation as any;
+
+  // Enforce password gate before checking download permission
+  if (shareLink.passwordProtected) {
+    const unlockToken =
+      (req.headers["x-unlock-token"] as string | undefined) ??
+      (req.query.unlockToken as string | undefined);
+
+    if (!unlockToken) {
+      res.status(401).json({ message: "Password required.", passwordRequired: true });
+      return;
+    }
+
+    try {
+      const decoded = jwt.verify(unlockToken, process.env.JWT_SECRET as string) as any;
+      if (decoded.type !== "share-unlock" || decoded.shareToken !== shareLink.token) {
+        res.status(401).json({ message: "Invalid unlock token." });
+        return;
+      }
+    } catch {
+      res.status(401).json({ message: "Unlock token expired or invalid." });
+      return;
+    }
+  }
 
   if (shareLink.permissionMode === "download") {
     next();

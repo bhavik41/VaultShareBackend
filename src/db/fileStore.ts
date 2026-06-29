@@ -16,6 +16,7 @@ export interface StoredFile {
   publicUrl: string;
   adminOnlyChat: boolean;
   createdAt: Date;
+  isEncrypted: boolean;
 }
 
 function toStoredFile(doc: IFile): StoredFile {
@@ -29,6 +30,7 @@ function toStoredFile(doc: IFile): StoredFile {
     publicUrl: doc.publicUrl,
     adminOnlyChat: doc.adminOnlyChat ?? false,
     createdAt: doc.createdAt,
+    isEncrypted: doc.isEncrypted ?? false,
   };
 }
 
@@ -42,6 +44,7 @@ export const createFile = async (file: StoredFile): Promise<StoredFile> => {
     diskPath: file.diskPath,
     publicUrl: file.publicUrl,
     createdAt: file.createdAt,
+    isEncrypted: file.isEncrypted,
   });
   return toStoredFile(doc.toObject());
 };
