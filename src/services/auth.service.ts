@@ -39,7 +39,7 @@ export function issueAccessToken(payload: UserPayload): string {
 }
 
 export function issueRefreshToken(payload: UserPayload): string {
-  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d" });
+  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: "7d", jwtid: uuidv4() });
 }
 
 export function issueTempToken(payload: TempTokenPayload): string {

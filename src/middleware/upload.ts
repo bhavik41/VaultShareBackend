@@ -77,6 +77,7 @@ const TEXT_BASED_MIMES = new Set([
 ]);
 
 const MAX_MB = parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10);
+export const MAX_FILE_SIZE_BYTES = MAX_MB * 1024 * 1024;
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -89,7 +90,7 @@ const storage = multer.diskStorage({
   },
 });
 
-function fileFilter(
+export function fileFilter(
   _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
@@ -107,7 +108,7 @@ function fileFilter(
 
 export const upload = multer({
   storage,
-  limits: { fileSize: MAX_MB * 1024 * 1024 },
+  limits: { fileSize: MAX_FILE_SIZE_BYTES },
   fileFilter,
 });
 

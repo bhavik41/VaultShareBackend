@@ -98,7 +98,7 @@ function generateShareToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-function parseExpirationDate(expiresAt?: string): Date {
+export function parseExpirationDate(expiresAt?: string): Date {
   if (!expiresAt) {
     return new Date(Date.now() + 24 * 60 * 60 * 1000);
   }

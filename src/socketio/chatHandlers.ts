@@ -15,7 +15,7 @@ import * as auditService from "../services/audit.service";
 
 const MAX_CONTENT_LENGTH = 2000;
 
-function validateContent(content: unknown): content is string {
+export function validateContent(content: unknown): content is string {
   return (
     typeof content === "string" &&
     content.trim().length > 0 &&
@@ -23,7 +23,7 @@ function validateContent(content: unknown): content is string {
   );
 }
 
-function isNonEmptyString(value: unknown): value is string {
+export function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
