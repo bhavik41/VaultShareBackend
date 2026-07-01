@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { FileController } from "../controllers/file.controller";
+import { VersionController } from "../controllers/version.controller";
 import { authenticate } from "../middleware/auth";
 import { upload, validateMagicBytes } from "../middleware/upload";
 import { requirePermission } from "../middleware/permissions";
@@ -36,6 +37,12 @@ router.delete(
   "/:fileId",
   requirePermission("owner"),
   FileController.deleteFile,
+);
+
+router.patch(
+  "/:fileId/version-policy",
+  requirePermission("owner"),
+  VersionController.updatePolicy,
 );
 
 export default router;

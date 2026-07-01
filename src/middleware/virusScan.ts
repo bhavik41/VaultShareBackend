@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
+import os from "os";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
 
 const execAsync = promisify(exec);
 
@@ -15,6 +18,9 @@ const execAsync = promisify(exec);
  *
  * Exit codes from clamscan:
  *   0 = clean, 1 = virus found, 2 = error
+ *
+ * The upload buffer lives in memory (see middleware/upload.ts); this writes
+ * it to a short-lived temp file for clamscan to read, then always deletes it.
  */
 export async function virusScan(
   req: Request,
@@ -32,14 +38,16 @@ export async function virusScan(
     return;
   }
 
+  const tempPath = path.join(os.tmpdir(), `vaultshare-scan-${uuidv4()}`);
+  fs.writeFileSync(tempPath, file.buffer);
+
   try {
-    await execAsync(`clamscan --no-summary "${file.path}"`);
+    await execAsync(`clamscan --no-summary "${tempPath}"`);
     // exit 0 → clean
     next();
   } catch (err: any) {
     if (err.code === 1) {
       // exit 1 → virus detected
-      fs.unlink(file.path, () => {});
       res.status(422).json({ message: "Malware detected. Upload rejected." });
       return;
     }
@@ -48,12 +56,13 @@ export async function virusScan(
     console.warn("[virus-scan] ClamAV unavailable or scan error:", err.message);
 
     if (process.env.VIRUS_SCAN_STRICT === "true") {
-      fs.unlink(file.path, () => {});
       res.status(503).json({ message: "Virus scanner unavailable. Upload rejected." });
       return;
     }
 
     // Fail open: log the warning and proceed
     next();
+  } finally {
+    fs.unlink(tempPath, () => {});
   }
 }

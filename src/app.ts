@@ -10,6 +10,8 @@ import starredRoutes from "./routes/starred";
 import activityRoutes from "./routes/activity";
 import chatRouter from "./routes/chat";
 import groupsRouter from "./routes/groups";
+import versionsRouter, { versionRequestsRouter } from "./routes/versions";
+import notificationsRouter from "./routes/notifications";
 
 const app = express()
 
@@ -37,5 +39,8 @@ app.use("/api/starred", starredRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/chat", chatRouter);
 app.use("/api/groups", groupsRouter);
+app.use("/api/files/:fileId/versions", versionsRouter);
+app.use("/api/version-requests", versionRequestsRouter);
+app.use("/api/notifications", notificationsRouter);
 
 export default app

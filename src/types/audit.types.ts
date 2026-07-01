@@ -8,6 +8,12 @@
   | "revoke_access"
   | "star"
   | "invitation_accepted"
+  | "version_upload"
+  | "version_request"
+  | "version_approved"
+  | "version_rejected"
+  | "version_activated"
+  | "version_deleted"
 
 export interface AuditLogEntry {
   id: string

@@ -65,3 +65,41 @@ export const sendFileSharedEmail = async (
   })
 }
 
+export const sendVersionRequestEmail = async (
+  to: string,
+  fileName: string,
+  requesterName: string,
+): Promise<void> => {
+  await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `VaultShare — New version upload request for "${fileName}"`,
+    text: `${requesterName} has requested to upload a new version of "${fileName}".\n\nSign in to VaultShare to review and approve or reject the request.`,
+  })
+}
+
+export const sendVersionApprovedEmail = async (
+  to: string,
+  fileName: string,
+  versionNumber: number,
+): Promise<void> => {
+  await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `VaultShare — Your version upload for "${fileName}" was approved`,
+    text: `Your requested version (v${versionNumber}) of "${fileName}" has been approved and added to the file's version history.`,
+  })
+}
+
+export const sendVersionRejectedEmail = async (
+  to: string,
+  fileName: string,
+): Promise<void> => {
+  await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `VaultShare — Your version upload for "${fileName}" was rejected`,
+    text: `Your requested version upload for "${fileName}" was rejected by the file owner.`,
+  })
+}
+

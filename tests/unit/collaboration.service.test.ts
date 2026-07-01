@@ -66,6 +66,8 @@ const file: StoredFile = {
   adminOnlyChat: false,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   isEncrypted: false,
+  versionPolicy: "admin_only",
+  activeVersionId: null,
 };
 
 function user(overrides: Partial<StoredUser>): StoredUser {

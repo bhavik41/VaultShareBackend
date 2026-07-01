@@ -10,6 +10,12 @@ export type AuditAction =
   | "revoke_access"
   | "star"
   | "invitation_accepted"
+  | "version_upload"
+  | "version_request"
+  | "version_approved"
+  | "version_rejected"
+  | "version_activated"
+  | "version_deleted"
 
 export interface IAuditLog {
   _id: string
@@ -33,6 +39,8 @@ const auditLogSchema = new Schema<IAuditLog>({
       "upload", "download", "view", "share",
       "permission_change", "delete", "revoke_access", "star",
       "invitation_accepted",
+      "version_upload", "version_request", "version_approved",
+      "version_rejected", "version_activated", "version_deleted",
     ],
     required: true,
   },
