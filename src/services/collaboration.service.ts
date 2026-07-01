@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "../utils/uuid";
 import { getFileById, getFilesByIds } from "../db/fileStore";
+import { requireFileAccess } from "../utils/accessControl";
 import { findUserByEmail, findUserById, findUsersByIds } from "../db/inMemoryStore";
 import * as fileService from "./file.service";
 import {
@@ -289,7 +290,7 @@ export async function shareFileWithUser(input: ShareFileInput): Promise<FileShar
 }
 
 export async function listSharedUsers(fileId: string, ownerId: string, limit: number = 50, offset: number = 0) {
-  const file = await requireFileOwner(fileId, ownerId);
+  const { file } = await requireFileAccess(fileId, ownerId, "view");
 
   const shares = await getSharesByFile(file.id, limit, offset);
   
