@@ -4,7 +4,7 @@
  * The uploaded bytes live on local disk (see middleware/upload.ts); this store
  * persists the metadata that maps a file id to its disk path, owner, etc.
  */
-import { FileModel, IFile } from "../models/File";
+import { FileModel, IFile, VersionPolicy } from "../models/File";
 
 export interface StoredFile {
   id: string;
@@ -17,6 +17,8 @@ export interface StoredFile {
   adminOnlyChat: boolean;
   createdAt: Date;
   isEncrypted: boolean;
+  versionPolicy: VersionPolicy;
+  activeVersionId: string | null;
 }
 
 function toStoredFile(doc: IFile): StoredFile {
@@ -31,10 +33,14 @@ function toStoredFile(doc: IFile): StoredFile {
     adminOnlyChat: doc.adminOnlyChat ?? false,
     createdAt: doc.createdAt,
     isEncrypted: doc.isEncrypted ?? false,
+    versionPolicy: doc.versionPolicy ?? "admin_only",
+    activeVersionId: doc.activeVersionId ?? null,
   };
 }
 
-export const createFile = async (file: StoredFile): Promise<StoredFile> => {
+export const createFile = async (
+  file: Omit<StoredFile, "versionPolicy" | "activeVersionId">,
+): Promise<StoredFile> => {
   const doc = await FileModel.create({
     _id: file.id,
     userId: file.userId,
@@ -73,6 +79,27 @@ export const setAdminOnlyChat = async (
     { adminOnlyChat },
     { new: true },
   ).lean();
+  return doc ? toStoredFile(doc) : undefined;
+};
+
+export const updateVersionPolicy = async (
+  id: string,
+  versionPolicy: VersionPolicy,
+): Promise<StoredFile | undefined> => {
+  const doc = await FileModel.findByIdAndUpdate(id, { versionPolicy }, { new: true }).lean();
+  return doc ? toStoredFile(doc) : undefined;
+};
+
+/**
+ * Mirrors the active version's size/mimeType/isEncrypted onto the parent
+ * File record so callers that read those fields directly (dashboard list,
+ * chat, previews) stay in sync after a promote/activate.
+ */
+export const updateFileVersionSummary = async (
+  id: string,
+  updates: { size: number; mimeType: string; isEncrypted: boolean },
+): Promise<StoredFile | undefined> => {
+  const doc = await FileModel.findByIdAndUpdate(id, updates, { new: true }).lean();
   return doc ? toStoredFile(doc) : undefined;
 };
 
