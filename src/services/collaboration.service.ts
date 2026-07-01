@@ -29,6 +29,7 @@ import {
   updateInvitationStatus,
 } from "../db/collaborationStore";
 import * as auditService from "./audit.service";
+import { sendFileSharedEmail } from "../utils/email";
 
 interface InviteCollaboratorInput {
   fileId: string;
@@ -156,6 +157,9 @@ export async function inviteCollaborator(
 
   auditService.logAction(file.id, inviterId, "share", `Invited ${inviteeEmail} as ${role}`);
 
+  const inviter = await findUserById(inviterId);
+  sendFileSharedEmail(invitee.email, file.originalName, inviter?.name ?? "Someone", role).catch(() => {});
+
   return invitation;
 }
 
@@ -277,6 +281,9 @@ export async function shareFileWithUser(input: ShareFileInput): Promise<FileShar
   });
 
   auditService.logAction(file.id, ownerId, "share", `Shared file with ${collaboratorEmail} as ${role}`);
+
+  const owner = await findUserById(ownerId);
+  sendFileSharedEmail(collaborator.email, file.originalName, owner?.name ?? "Someone", role).catch(() => {});
 
   return share;
 }
