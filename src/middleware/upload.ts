@@ -1,8 +1,5 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import type { Request, Response, NextFunction } from "express";
-import { v4 as uuidv4 } from "uuid";
 
 // #31 — text/html removed (executes in browser)
 // #32 — image/svg+xml removed from allowlist (SVG can embed JS); serve separately as attachment only
@@ -79,17 +76,6 @@ const TEXT_BASED_MIMES = new Set([
 const MAX_MB = parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10);
 export const MAX_FILE_SIZE_BYTES = MAX_MB * 1024 * 1024;
 
-const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
-
 export function fileFilter(
   _req: Request,
   file: Express.Multer.File,
@@ -106,18 +92,20 @@ export function fileFilter(
   }
 }
 
+// Files are buffered in memory (not written to local disk) and pushed to S3
+// by the service layer, which also performs the destination-key mapping.
 export const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE_BYTES },
   fileFilter,
 });
 
 /**
  * #30 — Magic byte validation middleware.
- * Must run AFTER multer has written the file to disk.
- * Reads the first 16 bytes of the uploaded file and compares against
- * known magic byte signatures. Text-based formats (JSON, CSV, etc.) are
- * skipped since they have no reliable binary signature.
+ * Reads the first 16 bytes of the in-memory uploaded buffer and compares
+ * against known magic byte signatures. Text-based formats (JSON, CSV, etc.)
+ * are skipped since they have no reliable binary signature. Runs before the
+ * buffer is ever pushed to S3, so a rejected upload never reaches storage.
  */
 export function validateMagicBytes(
   req: Request,
@@ -136,39 +124,25 @@ export function validateMagicBytes(
     return;
   }
 
-  try {
-    const fd = fs.openSync(file.path, "r");
-    const buf = Buffer.alloc(16);
-    fs.readSync(fd, buf, 0, 16, 0);
-    fs.closeSync(fd);
-
-    const fileHex = buf.toString("hex");
-
-    const signatures = MAGIC_BYTES.filter((m) => m.mime === file.mimetype);
-    if (signatures.length === 0) {
-      // No known signature for this mime — allow through (conservative)
-      next();
-      return;
-    }
-
-    const valid = signatures.some((sig) => {
-      const slice = buf.slice(sig.offset, sig.offset + sig.hex.length / 2).toString("hex");
-      return slice.startsWith(sig.hex);
-    });
-
-    if (!valid) {
-      // Delete the suspect file from disk
-      fs.unlink(file.path, () => {});
-      res.status(400).json({
-        message: `File content does not match declared type "${file.mimetype}". Upload rejected.`,
-      });
-      return;
-    }
-
+  const buf = file.buffer.subarray(0, 16);
+  const signatures = MAGIC_BYTES.filter((m) => m.mime === file.mimetype);
+  if (signatures.length === 0) {
+    // No known signature for this mime — allow through (conservative)
     next();
-  } catch (err: any) {
-    // Delete on read failure to be safe
-    if (file.path) fs.unlink(file.path, () => {});
-    res.status(500).json({ message: "Failed to validate file content." });
+    return;
   }
+
+  const valid = signatures.some((sig) => {
+    const slice = buf.subarray(sig.offset, sig.offset + sig.hex.length / 2).toString("hex");
+    return slice.startsWith(sig.hex);
+  });
+
+  if (!valid) {
+    res.status(400).json({
+      message: `File content does not match declared type "${file.mimetype}". Upload rejected.`,
+    });
+    return;
+  }
+
+  next();
 }
