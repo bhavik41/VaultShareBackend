@@ -1,4 +1,3 @@
-import fs from "fs";
 import * as s3Service from "./s3.service";
 import * as auditService from "./audit.service";
 import { MAX_USER_STORAGE_BYTES } from "./file.service";
@@ -74,9 +73,7 @@ export async function uploadVersionDirect(
   const versionNumber = await getNextVersionNumber(fileId);
   const isEncrypted = options.isEncrypted ?? false;
   const s3Key = s3Service.buildVersionKey(file.userId, fileId, versionNumber, multerFile.originalname);
-  const fileBuffer = fs.readFileSync(multerFile.path);
-  await s3Service.putObject(s3Key, fileBuffer, multerFile.mimetype);
-  fs.unlink(multerFile.path, () => {});
+  await s3Service.putObject(s3Key, multerFile.buffer, multerFile.mimetype);
 
   const version = await createFileVersion({
     fileId,
@@ -113,9 +110,7 @@ export async function requestVersionUpload(
   if (decision !== "request") throw new Error("Access denied.");
 
   const stagingKey = s3Service.buildStagingKey(fileId, multerFile.originalname);
-  const stagingBuffer = fs.readFileSync(multerFile.path);
-  await s3Service.putObject(stagingKey, stagingBuffer, multerFile.mimetype);
-  fs.unlink(multerFile.path, () => {});
+  await s3Service.putObject(stagingKey, multerFile.buffer, multerFile.mimetype);
 
   const request = await createVersionRequest({
     fileId,
