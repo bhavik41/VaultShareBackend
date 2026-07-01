@@ -7,6 +7,7 @@ import {
   getFileById,
   getFilesByUser,
   deleteFile as deleteFileFromStore,
+  setAdminOnlyChat as setAdminOnlyChatInStore,
   StoredFile,
 } from "../db/fileStore";
 import {
@@ -192,4 +193,17 @@ export async function getFileDetails(
   const { file } = await requireFileAccess(fileId, requestingUserId, "view");
 
   return file;
+}
+
+export async function setAdminOnlyChat(
+  fileId: string,
+  requestingUserId: string,
+  adminOnlyChat: boolean,
+): Promise<StoredFile> {
+  const file = await getFileById(fileId);
+  if (!file) throw new Error("File not found.");
+  if (file.userId !== requestingUserId) throw new Error("Access denied.");
+  const updated = await setAdminOnlyChatInStore(fileId, adminOnlyChat);
+  if (!updated) throw new Error("File not found.");
+  return updated;
 }
