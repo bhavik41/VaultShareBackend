@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import type { Request, Response, NextFunction } from "express";
 import { fileFilter, MAX_FILE_SIZE_BYTES, validateMagicBytes } from "../../src/middleware/upload";
 
@@ -71,20 +69,9 @@ describe("upload fileFilter", () => {
 });
 
 describe("validateMagicBytes", () => {
-  const tmpDir = path.join(process.cwd(), ".tmp-tests");
-
-  beforeEach(() => {
-    fs.mkdirSync(tmpDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
   it("allows a PDF whose content matches its declared MIME type", () => {
-    const filePath = path.join(tmpDir, "valid.pdf");
-    fs.writeFileSync(filePath, Buffer.from("%PDF-1.7\ncontent"));
-    const req = { file: multerFile({ path: filePath, mimetype: "application/pdf" }) } as Request;
+    const buffer = Buffer.from("%PDF-1.7\ncontent");
+    const req = { file: multerFile({ buffer, mimetype: "application/pdf" }) } as Request;
     const res = mockResponse();
     const next: NextFunction = jest.fn();
 
@@ -95,9 +82,8 @@ describe("validateMagicBytes", () => {
   });
 
   it("rejects a spoofed PDF whose bytes do not match the declared MIME type", () => {
-    const filePath = path.join(tmpDir, "spoofed.pdf");
-    fs.writeFileSync(filePath, Buffer.from("<script>alert(1)</script>"));
-    const req = { file: multerFile({ path: filePath, mimetype: "application/pdf" }) } as Request;
+    const buffer = Buffer.from("<script>alert(1)</script>");
+    const req = { file: multerFile({ buffer, mimetype: "application/pdf" }) } as Request;
     const res = mockResponse();
     const next: NextFunction = jest.fn();
 
@@ -108,6 +94,5 @@ describe("validateMagicBytes", () => {
     expect(res.json).toHaveBeenCalledWith({
       message: 'File content does not match declared type "application/pdf". Upload rejected.',
     });
-    expect(fs.existsSync(filePath)).toBe(false);
   });
 });
