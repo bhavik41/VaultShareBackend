@@ -51,7 +51,7 @@ export async function listVersions(
   fileId: string,
   userId: string,
 ): Promise<StoredFileVersion[]> {
-  await requireFileAccess(fileId, userId, "edit");
+  await requireFileAccess(fileId, userId, "view");
   return getVersionsByFile(fileId);
 }
 
