@@ -79,11 +79,12 @@ const viewDebounce = new Map<string, number>()
 export async function createViewLogDeduped(
   fileId: string,
   userId: string,
-  windowMs = 5000,
+  metadata?: Record<string, unknown>,
+  windowMs = parseInt(process.env.AUDIT_VIEW_DEDUP_WINDOW_MS ?? "5000", 10),
 ): Promise<void> {
   const key = `${fileId}:${userId}`
   const last = viewDebounce.get(key) ?? 0
   if (Date.now() - last < windowMs) return
   viewDebounce.set(key, Date.now())
-  await createAuditLog(fileId, userId, "view")
+  await createAuditLog(fileId, userId, "view", undefined, metadata)
 }

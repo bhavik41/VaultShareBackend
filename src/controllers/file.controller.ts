@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as fileService from "../services/file.service";
-import { logAction } from "../utils/auditLogger";
+import { logAction, logViewAction } from "../utils/auditLogger";
 
 /** #41 — Strip \r and \n to prevent Content-Disposition header injection */
 function sanitizeFilename(name: string): string {
@@ -58,7 +58,7 @@ export class FileController {
       const { stream, originalName, mimeType, size } =
         await fileService.streamFileDownload(req.params.fileId, req.user!.id);
 
-      logAction(req, req.params.fileId, req.user!.id, "view", `Previewed ${originalName}`);
+      logViewAction(req, req.params.fileId, req.user!.id);
       const safeFilename = sanitizeFilename(originalName);
       res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(safeFilename)}"`);
       res.setHeader("Content-Type", mimeType);
@@ -90,7 +90,7 @@ export class FileController {
   static async viewFile(req: Request, res: Response): Promise<void> {
     try {
       const file = await fileService.getFileDetails(req.params.fileId, req.user!.id);
-      logAction(req, file.id, req.user!.id, "view", `Viewed ${file.originalName}`);
+      logViewAction(req, file.id, req.user!.id);
       res.status(200).json({ file });
     } catch (error: any) {
       const status =
