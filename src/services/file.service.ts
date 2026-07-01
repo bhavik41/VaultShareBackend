@@ -70,6 +70,7 @@ export async function uploadFile(
     versionNumber: 1,
     uploadedBy: userId,
     s3Key,
+    originalName: multerFile.originalname,
     size: multerFile.size,
     mimeType,
     isEncrypted,

@@ -6,6 +6,7 @@ export interface IFileVersion {
   versionNumber: number;
   uploadedBy: string;
   s3Key: string;
+  originalName: string;
   size: number;
   mimeType: string;
   changeNote?: string;
@@ -20,6 +21,7 @@ const fileVersionSchema = new Schema<IFileVersion>({
   versionNumber: { type: Number, required: true },
   uploadedBy: { type: String, required: true },
   s3Key: { type: String, required: true },
+  originalName: { type: String, default: "" },
   size: { type: Number, required: true },
   mimeType: { type: String, required: true },
   changeNote: { type: String },
