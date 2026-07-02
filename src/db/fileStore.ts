@@ -9,6 +9,7 @@ import { FileModel, IFile, VersionPolicy } from "../models/File";
 export interface StoredFile {
   id: string;
   userId: string;
+  name: string;
   originalName: string;
   mimeType: string;
   size: number;
@@ -25,6 +26,7 @@ function toStoredFile(doc: IFile): StoredFile {
   return {
     id: doc._id,
     userId: doc.userId,
+    name: doc.originalName,
     originalName: doc.originalName,
     mimeType: doc.mimeType,
     size: doc.size,
@@ -39,7 +41,7 @@ function toStoredFile(doc: IFile): StoredFile {
 }
 
 export const createFile = async (
-  file: Omit<StoredFile, "versionPolicy" | "activeVersionId">,
+  file: Omit<StoredFile, "name" | "versionPolicy" | "activeVersionId">,
 ): Promise<StoredFile> => {
   const doc = await FileModel.create({
     _id: file.id,
