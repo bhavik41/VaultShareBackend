@@ -189,11 +189,9 @@ export async function deleteFile(
 export async function getFileDetails(
   fileId: string,
   requestingUserId: string,
-): Promise<StoredFile> {
-  // Owner or any user the file is shared with may view its details.
-  const { file } = await requireFileAccess(fileId, requestingUserId, "view");
-
-  return file;
+): Promise<{ file: StoredFile; role: string }> {
+  const { file, role } = await requireFileAccess(fileId, requestingUserId, "view");
+  return { file, role };
 }
 
 export async function setAdminOnlyChat(

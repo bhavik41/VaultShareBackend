@@ -89,9 +89,9 @@ export class FileController {
 
   static async viewFile(req: Request, res: Response): Promise<void> {
     try {
-      const file = await fileService.getFileDetails(req.params.fileId, req.user!.id);
+      const { file, role } = await fileService.getFileDetails(req.params.fileId, req.user!.id);
       logViewAction(req, file.id, req.user!.id);
-      res.status(200).json({ file });
+      res.status(200).json({ file, role });
     } catch (error: any) {
       const status =
         error.message === "Access denied." ? 403
