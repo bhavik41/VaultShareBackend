@@ -13,12 +13,12 @@ export class GroupController {
 
   static async createGroup(req: Request, res: Response): Promise<void> {
     try {
-      const { name, description } = req.body
+      const { name, description, defaultRole } = req.body
       if (!name) {
         res.status(400).json({ message: 'name is required.' })
         return
       }
-      const group = await groupService.createNewGroup(req.user!.id, name, description)
+      const group = await groupService.createNewGroup(req.user!.id, name, description, defaultRole ?? 'viewer')
       res.status(201).json({ message: 'Group created.', group })
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message })
@@ -47,8 +47,8 @@ export class GroupController {
   static async updateGroup(req: Request, res: Response): Promise<void> {
     try {
       const { groupId } = req.params
-      const { name, description } = req.body
-      const group = await groupService.updateGroupDetails(groupId, req.user!.id, { name, description })
+      const { name, description, defaultRole } = req.body
+      const group = await groupService.updateGroupDetails(groupId, req.user!.id, { name, description, defaultRole })
       res.status(200).json({ message: 'Group updated.', group })
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message })
