@@ -1,5 +1,6 @@
 import { StoredFile, getFileById } from "../db/fileStore";
 import { CollaboratorRole, getFileShare } from "../db/collaborationStore";
+import { getGroupsForUser, getGroupFileShare } from "../db/groupStore";
 
 export type FileAccessAction = "view" | "edit" | "download" | "owner";
 
@@ -32,10 +33,30 @@ export async function getFilePermission(
     return { file, role: "owner" };
   }
 
+  // Direct individual share takes precedence over group share.
   const share = await getFileShare(fileId, userId);
-  if (!share) return null;
+  if (share) return { file, role: share.role };
 
-  return { file, role: share.role };
+  // Check if user has access via a group file share.
+  const memberships = await getGroupsForUser(userId);
+  if (memberships.length > 0) {
+    const groupShares = await Promise.all(
+      memberships.map((m) => getGroupFileShare(m.groupId, fileId)),
+    );
+    // Find the highest role granted across all groups the user is in.
+    let bestRole: CollaboratorRole | null = null;
+    for (let i = 0; i < memberships.length; i++) {
+      const gs = groupShares[i];
+      if (!gs) continue;
+      const candidate = gs.role as CollaboratorRole;
+      if (!bestRole || roleRank[candidate] > roleRank[bestRole]) {
+        bestRole = candidate;
+      }
+    }
+    if (bestRole) return { file, role: bestRole };
+  }
+
+  return null;
 }
 
 export async function requireFileAccess(
