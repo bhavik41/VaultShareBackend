@@ -11,6 +11,9 @@ export interface IUser {
   twoFactorEnabled: boolean
   resetOtp: string | null
   resetOtpExpiry: Date | null
+  // Email OTP for signin
+  signinOtp: string | null
+  signinOtpExpiry: Date | null
   // Account lockout (#5)
   failedLoginAttempts: number
   lockoutUntil: Date | null
@@ -27,6 +30,8 @@ const userSchema = new Schema<IUser>({
   twoFactorEnabled: { type: Boolean, default: false },
   resetOtp: { type: String, default: null },
   resetOtpExpiry: { type: Date, default: null },
+  signinOtp: { type: String, default: null },
+  signinOtpExpiry: { type: Date, default: null },
   // Account lockout (#5)
   failedLoginAttempts: { type: Number, default: 0 },
   lockoutUntil: { type: Date, default: null },

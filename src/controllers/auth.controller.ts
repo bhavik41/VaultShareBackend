@@ -8,6 +8,7 @@ import type {
   ResetPasswordBody,
   Verify2FABody,
   Validate2FABody,
+  VerifySigninOtpBody,
 } from "../types/index";
 
 export class AuthController {
@@ -18,26 +19,12 @@ export class AuthController {
     try {
       const { name, email, password } = req.body;
       if (!name || !email || !password) {
-        res
-          .status(400)
-          .json({ message: "Name, email, and password are required." });
+        res.status(400).json({ message: "Name, email, and password are required." });
         return;
       }
 
-      const { user, accessToken, refreshToken } = await authService.signup(
-        req.body,
-      );
-      res.status(201).json({
-        message: "Account created successfully.",
-        token: accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          createdAt: user.createdAt,
-        },
-      });
+      const result = await authService.signup(req.body);
+      res.status(201).json({ requiresOtp: true, tempToken: result.tempToken });
     } catch (error: any) {
       if (error.message.includes("already exists")) {
         res.status(409).json({ message: error.message });
@@ -61,21 +48,38 @@ export class AuthController {
       const result = await authService.signin(req.body);
 
       if (result.requires2fa) {
-        res
-          .status(200)
-          .json({ requires2fa: true, tempToken: result.tempToken });
+        res.status(200).json({ requires2fa: true, tempToken: result.tempToken });
         return;
       }
 
+      // Email OTP required — tempToken issued, code sent to inbox
+      res.status(200).json({ requiresOtp: true, tempToken: result.tempToken });
+    } catch (error: any) {
+      res.status(401).json({ message: error.message });
+    }
+  }
+
+  static async verifySigninOtp(
+    req: Request<object, object, VerifySigninOtpBody>,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { tempToken, otp } = req.body;
+      if (!tempToken || !otp) {
+        res.status(400).json({ message: "tempToken and otp are required." });
+        return;
+      }
+
+      const result = await authService.verifySigninOtp(tempToken, otp);
       res.status(200).json({
         message: "Signed in successfully.",
         token: result.accessToken,
         refreshToken: result.refreshToken,
         user: {
-          id: result.user!.id,
-          name: result.user!.name,
-          email: result.user!.email,
-          createdAt: result.user!.createdAt,
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          createdAt: result.user.createdAt,
         },
       });
     } catch (error: any) {
@@ -94,11 +98,8 @@ export class AuthController {
         return;
       }
 
-      const { newAccessToken, newRefreshToken } =
-        await authService.refresh(refreshToken);
-      res
-        .status(200)
-        .json({ token: newAccessToken, refreshToken: newRefreshToken });
+      const { newAccessToken, newRefreshToken } = await authService.refresh(refreshToken);
+      res.status(200).json({ token: newAccessToken, refreshToken: newRefreshToken });
     } catch (error: any) {
       res.status(401).json({ message: error.message });
     }
@@ -130,11 +131,7 @@ export class AuthController {
       }
 
       await authService.forgotPassword(email);
-
-      // #18 — Always return the same generic response (no email enumeration)
-      res.status(200).json({
-        message: "If that email exists, an OTP has been sent.",
-      });
+      res.status(200).json({ message: "If that email exists, an OTP has been sent." });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -147,18 +144,12 @@ export class AuthController {
     try {
       const { email, otp, newPassword } = req.body;
       if (!email || !otp || !newPassword) {
-        res
-          .status(400)
-          .json({ message: "Email, OTP, and new password are required." });
+        res.status(400).json({ message: "Email, OTP, and new password are required." });
         return;
       }
 
       await authService.resetPassword(req.body);
-      res
-        .status(200)
-        .json({
-          message: "Password reset successfully. Please sign in again.",
-        });
+      res.status(200).json({ message: "Password reset successfully. Please sign in again." });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -168,8 +159,7 @@ export class AuthController {
     try {
       const result = await authService.setup2fa(req.user!.id);
       res.status(200).json({
-        message:
-          "Scan the QR code with your authenticator app, then call /2fa/verify.",
+        message: "Scan the QR code with your authenticator app, then call /2fa/verify.",
         ...result,
       });
     } catch (error: any) {
@@ -202,9 +192,7 @@ export class AuthController {
     try {
       const { tempToken, token } = req.body;
       if (!tempToken || !token) {
-        res
-          .status(400)
-          .json({ message: "tempToken and TOTP token are required." });
+        res.status(400).json({ message: "tempToken and TOTP token are required." });
         return;
       }
 

@@ -91,6 +91,15 @@ export const sendVersionApprovedEmail = async (
   })
 }
 
+export const sendSigninOtpEmail = async (to: string, otp: string): Promise<void> => {
+  await transporter.sendMail({
+    from: `"VaultShare" <${process.env.SMTP_USER}>`,
+    to,
+    subject: "VaultShare — Your Sign-In Code",
+    text: `Your sign-in verification code is: ${otp}\n\nThis code expires in 10 minutes. If you did not attempt to sign in, please change your password immediately.`,
+  })
+}
+
 export const sendVersionRejectedEmail = async (
   to: string,
   fileName: string,

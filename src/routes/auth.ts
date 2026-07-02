@@ -13,6 +13,7 @@ const router = Router();
 // #1 / #4 — rate-limited public auth routes
 router.post("/signup", signupLimiter, AuthController.signup);
 router.post("/signin", signinLimiter, AuthController.signin);
+router.post("/signin/verify-otp", signinLimiter, AuthController.verifySigninOtp);
 router.post("/refresh", AuthController.refresh);
 router.post("/logout", authenticate, AuthController.logout);
 router.get("/me", authenticate, AuthController.me);

@@ -22,7 +22,7 @@ import type {
   UserPayload,
   TempTokenPayload,
 } from "../types/index";
-import { sendPasswordResetEmail } from "../utils/email";
+import { sendPasswordResetEmail, sendSigninOtpEmail } from "../utils/email";
 
 // #82, #83 — Fail fast at startup if required secrets are missing, no fallback chaining
 export const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -87,6 +87,8 @@ export async function signup(data: SignupBody) {
     twoFactorEnabled: false,
     resetOtp: null,
     resetOtpExpiry: null,
+    signinOtp: null,
+    signinOtpExpiry: null,
     failedLoginAttempts: 0,
     lockoutUntil: null,
   });
@@ -98,11 +100,16 @@ export async function signup(data: SignupBody) {
     twoFactorEnabled: false,
   };
 
-  const accessToken = issueAccessToken(userPayload);
-  const refreshToken = issueRefreshToken(userPayload);
-  await updateUser(newUser.id, { refreshToken });
+  const otp = generateOtp();
+  const otpHash = await bcrypt.hash(otp, 10);
+  const expiry = new Date(Date.now() + 10 * 60 * 1000);
+  await updateUser(newUser.id, { signinOtp: otpHash, signinOtpExpiry: expiry });
+  sendSigninOtpEmail(newUser.email, otp).catch((err) =>
+    console.error("[signup] failed to send OTP email:", err.message),
+  );
 
-  return { user: newUser, accessToken, refreshToken };
+  const tempToken = issueTempToken({ id: newUser.id, requiresEmailOtp: true });
+  return { requiresOtp: true, tempToken };
 }
 
 export async function signin(data: SigninBody) {
@@ -144,8 +151,43 @@ export async function signin(data: SigninBody) {
 
   if (user.twoFactorEnabled) {
     const tempToken = issueTempToken({ id: user.id, requires2fa: true });
-    return { requires2fa: true, tempToken };
+    return { requires2fa: true, requiresOtp: false, tempToken };
   }
+
+  // Send email OTP for all users without TOTP 2FA
+  const otp = generateOtp();
+  const otpHash = await bcrypt.hash(otp, 10);
+  const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+  await updateUser(user.id, { signinOtp: otpHash, signinOtpExpiry: expiry });
+  sendSigninOtpEmail(user.email, otp).catch((err) =>
+    console.error("[signin] failed to send OTP email:", err.message),
+  );
+
+  const tempToken = issueTempToken({ id: user.id, requiresEmailOtp: true });
+  return { requires2fa: false, requiresOtp: true, tempToken };
+}
+
+export async function verifySigninOtp(tempToken: string, otp: string) {
+  let decoded: TempTokenPayload;
+  try {
+    decoded = jwt.verify(tempToken, TEMP_SECRET) as TempTokenPayload;
+  } catch {
+    throw new Error("Verification code expired. Please sign in again.");
+  }
+
+  if (!decoded.requiresEmailOtp) throw new Error("Invalid token.");
+
+  const user = await findUserById(decoded.id);
+  if (!user || !user.signinOtp || !user.signinOtpExpiry)
+    throw new Error("Invalid or expired verification code.");
+
+  if (user.signinOtpExpiry < new Date())
+    throw new Error("Verification code has expired. Please sign in again.");
+
+  const otpValid = await bcrypt.compare(otp, user.signinOtp);
+  if (!otpValid) throw new Error("Incorrect verification code.");
+
+  await updateUser(user.id, { signinOtp: null, signinOtpExpiry: null });
 
   const userPayload: UserPayload = {
     id: user.id,
@@ -157,7 +199,7 @@ export async function signin(data: SigninBody) {
   const refreshToken = issueRefreshToken(userPayload);
   await updateUser(user.id, { refreshToken });
 
-  return { requires2fa: false, user, accessToken, refreshToken };
+  return { user, accessToken, refreshToken };
 }
 
 export async function refresh(refreshToken: string) {
