@@ -24,6 +24,7 @@ import {
   getPendingRequestsForFiles,
   getUserPendingRequest,
   getUserRecentRequest,
+  getUserRejectedRequests,
   updateVersionRequestStatus,
   StoredVersionRequest,
 } from "../db/versionRequestStore";
@@ -159,6 +160,14 @@ export async function getMyPendingRequest(
 ): Promise<StoredVersionRequest | null> {
   await requireFileAccess(fileId, userId, "view");
   return (await getUserRecentRequest(fileId, userId)) ?? null;
+}
+
+export async function getMyRejectedRequests(
+  fileId: string,
+  userId: string,
+): Promise<StoredVersionRequest[]> {
+  await requireFileAccess(fileId, userId, "view");
+  return getUserRejectedRequests(fileId, userId);
 }
 
 /**

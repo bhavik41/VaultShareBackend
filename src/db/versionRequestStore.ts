@@ -80,6 +80,18 @@ export async function getUserRecentRequest(
   return doc ? toStored(doc) : undefined;
 }
 
+export async function getUserRejectedRequests(
+  fileId: string,
+  requestedBy: string,
+): Promise<StoredVersionRequest[]> {
+  const docs = await VersionRequestModel.find(
+    { fileId, requestedBy, status: "rejected" },
+    null,
+    { sort: { createdAt: -1 } },
+  ).lean();
+  return docs.map(toStored);
+}
+
 export async function getPendingRequestsByFile(fileId: string): Promise<StoredVersionRequest[]> {
   const docs = await VersionRequestModel.find({ fileId, status: "pending" })
     .sort({ createdAt: -1 })
