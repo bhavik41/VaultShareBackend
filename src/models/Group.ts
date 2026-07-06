@@ -8,6 +8,7 @@ export interface IGroup {
   name: string
   description?: string
   ownerId: string
+  defaultRole: SharedRole
   createdAt: Date
   updatedAt: Date
 }
@@ -35,6 +36,7 @@ const groupSchema = new Schema<IGroup>({
   name: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
   ownerId: { type: String, required: true, index: true },
+  defaultRole: { type: String, enum: ['viewer', 'editor'], default: 'viewer' },
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() },
 })

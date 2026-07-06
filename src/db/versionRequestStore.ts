@@ -60,6 +60,38 @@ export async function getVersionRequestById(id: string): Promise<StoredVersionRe
   return doc ? toStored(doc) : undefined;
 }
 
+export async function getUserPendingRequest(
+  fileId: string,
+  requestedBy: string,
+): Promise<StoredVersionRequest | undefined> {
+  const doc = await VersionRequestModel.findOne({ fileId, requestedBy, status: "pending" }).lean();
+  return doc ? toStored(doc) : undefined;
+}
+
+export async function getUserRecentRequest(
+  fileId: string,
+  requestedBy: string,
+): Promise<StoredVersionRequest | undefined> {
+  const doc = await VersionRequestModel.findOne(
+    { fileId, requestedBy, status: { $in: ["pending", "rejected"] } },
+    null,
+    { sort: { createdAt: -1 } },
+  ).lean();
+  return doc ? toStored(doc) : undefined;
+}
+
+export async function getUserRejectedRequests(
+  fileId: string,
+  requestedBy: string,
+): Promise<StoredVersionRequest[]> {
+  const docs = await VersionRequestModel.find(
+    { fileId, requestedBy, status: "rejected" },
+    null,
+    { sort: { createdAt: -1 } },
+  ).lean();
+  return docs.map(toStored);
+}
+
 export async function getPendingRequestsByFile(fileId: string): Promise<StoredVersionRequest[]> {
   const docs = await VersionRequestModel.find({ fileId, status: "pending" })
     .sort({ createdAt: -1 })

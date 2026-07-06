@@ -7,6 +7,7 @@ import {
   getFileById,
   getFilesByUser,
   deleteFile as deleteFileFromStore,
+  setAdminOnlyChat as setAdminOnlyChatInStore,
   StoredFile,
 } from "../db/fileStore";
 import {
@@ -69,6 +70,7 @@ export async function uploadFile(
     versionNumber: 1,
     uploadedBy: userId,
     s3Key,
+    originalName: multerFile.originalname,
     size: multerFile.size,
     mimeType,
     isEncrypted,
@@ -187,9 +189,20 @@ export async function deleteFile(
 export async function getFileDetails(
   fileId: string,
   requestingUserId: string,
-): Promise<StoredFile> {
-  // Owner or any user the file is shared with may view its details.
-  const { file } = await requireFileAccess(fileId, requestingUserId, "view");
+): Promise<{ file: StoredFile; role: string }> {
+  const { file, role } = await requireFileAccess(fileId, requestingUserId, "view");
+  return { file, role };
+}
 
-  return file;
+export async function setAdminOnlyChat(
+  fileId: string,
+  requestingUserId: string,
+  adminOnlyChat: boolean,
+): Promise<StoredFile> {
+  const file = await getFileById(fileId);
+  if (!file) throw new Error("File not found.");
+  if (file.userId !== requestingUserId) throw new Error("Access denied.");
+  const updated = await setAdminOnlyChatInStore(fileId, adminOnlyChat);
+  if (!updated) throw new Error("File not found.");
+  return updated;
 }

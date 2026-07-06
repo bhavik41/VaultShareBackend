@@ -5,10 +5,11 @@ export interface UserPayload {
   twoFactorEnabled?: boolean
 }
 
-// Temporary payload issued when 2FA is required before full login
+// Temporary payload issued when 2FA or email OTP is required before full login
 export interface TempTokenPayload {
   id: string
-  requires2fa: true
+  requires2fa?: boolean
+  requiresEmailOtp?: boolean
 }
 
 export interface SignupBody {
@@ -44,4 +45,9 @@ export interface Verify2FABody {
 export interface Validate2FABody {
   tempToken: string
   token: string // TOTP code
+}
+
+export interface VerifySigninOtpBody {
+  tempToken: string
+  otp: string
 }

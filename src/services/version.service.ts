@@ -22,6 +22,9 @@ import {
   getVersionRequestById,
   getPendingRequestsByFile,
   getPendingRequestsForFiles,
+  getUserPendingRequest,
+  getUserRecentRequest,
+  getUserRejectedRequests,
   updateVersionRequestStatus,
   StoredVersionRequest,
 } from "../db/versionRequestStore";
@@ -51,7 +54,7 @@ export async function listVersions(
   fileId: string,
   userId: string,
 ): Promise<StoredFileVersion[]> {
-  await requireFileAccess(fileId, userId, "edit");
+  await requireFileAccess(fileId, userId, "view");
   return getVersionsByFile(fileId);
 }
 
@@ -80,6 +83,7 @@ export async function uploadVersionDirect(
     versionNumber,
     uploadedBy: userId,
     s3Key,
+    originalName: multerFile.originalname,
     size: multerFile.size,
     mimeType: multerFile.mimetype,
     changeNote: options.changeNote,
@@ -150,6 +154,22 @@ export async function listPendingRequests(
   return getPendingRequestsByFile(fileId);
 }
 
+export async function getMyPendingRequest(
+  fileId: string,
+  userId: string,
+): Promise<StoredVersionRequest | null> {
+  await requireFileAccess(fileId, userId, "view");
+  return (await getUserRecentRequest(fileId, userId)) ?? null;
+}
+
+export async function getMyRejectedRequests(
+  fileId: string,
+  userId: string,
+): Promise<StoredVersionRequest[]> {
+  await requireFileAccess(fileId, userId, "view");
+  return getUserRejectedRequests(fileId, userId);
+}
+
 /**
  * Pending version requests across every file the given user owns — backs
  * the admin approval queue on the dashboard.
@@ -182,6 +202,7 @@ export async function approveVersionRequest(
     versionNumber,
     uploadedBy: request.requestedBy,
     s3Key: finalKey,
+    originalName: request.originalName,
     size: request.size,
     mimeType: request.mimeType,
     changeNote: request.changeNote,

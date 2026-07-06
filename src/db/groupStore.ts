@@ -16,6 +16,7 @@ export interface Group {
   name: string
   description?: string
   ownerId: string
+  defaultRole: SharedRole
   createdAt: Date
   updatedAt: Date
 }
@@ -46,6 +47,7 @@ function toGroup(doc: IGroup): Group {
     name: doc.name,
     description: doc.description,
     ownerId: doc.ownerId,
+    defaultRole: doc.defaultRole ?? 'viewer',
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   }
@@ -81,6 +83,7 @@ export const createGroup = async (group: Group): Promise<Group> => {
     name: group.name,
     description: group.description,
     ownerId: group.ownerId,
+    defaultRole: group.defaultRole,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
   })
@@ -99,7 +102,7 @@ export const getGroupsByOwner = async (ownerId: string): Promise<Group[]> => {
 
 export const updateGroup = async (
   id: string,
-  updates: Partial<Pick<Group, 'name' | 'description'>>,
+  updates: Partial<Pick<Group, 'name' | 'description' | 'defaultRole'>>,
 ): Promise<Group | undefined> => {
   const doc = await GroupModel.findByIdAndUpdate(
     id,

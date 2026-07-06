@@ -12,6 +12,7 @@ import chatRouter from "./routes/chat";
 import groupsRouter from "./routes/groups";
 import versionsRouter, { versionRequestsRouter } from "./routes/versions";
 import notificationsRouter from "./routes/notifications";
+import testRouter from "./routes/test";
 
 const app = express()
 
@@ -42,5 +43,11 @@ app.use("/api/groups", groupsRouter);
 app.use("/api/files/:fileId/versions", versionsRouter);
 app.use("/api/version-requests", versionRequestsRouter);
 app.use("/api/notifications", notificationsRouter);
+
+// Test-only helpers — only mounted when ENABLE_E2E_ROUTES=true
+if (process.env.ENABLE_E2E_ROUTES === "true") {
+  app.use("/api/test", testRouter);
+  console.log("⚠️  E2E test routes enabled — do not use in production");
+}
 
 export default app

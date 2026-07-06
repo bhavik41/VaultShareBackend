@@ -8,6 +8,7 @@ export interface StoredFileVersion {
   versionNumber: number;
   uploadedBy: string;
   s3Key: string;
+  originalName: string;
   size: number;
   mimeType: string;
   changeNote?: string;
@@ -23,6 +24,7 @@ function toStored(doc: IFileVersion): StoredFileVersion {
     versionNumber: doc.versionNumber,
     uploadedBy: doc.uploadedBy,
     s3Key: doc.s3Key,
+    originalName: doc.originalName ?? "",
     size: doc.size,
     mimeType: doc.mimeType,
     changeNote: doc.changeNote,
@@ -44,6 +46,7 @@ export async function createFileVersion(input: {
   versionNumber: number;
   uploadedBy: string;
   s3Key: string;
+  originalName: string;
   size: number;
   mimeType: string;
   changeNote?: string;

@@ -89,14 +89,29 @@ export class FileController {
 
   static async viewFile(req: Request, res: Response): Promise<void> {
     try {
-      const file = await fileService.getFileDetails(req.params.fileId, req.user!.id);
+      const { file, role } = await fileService.getFileDetails(req.params.fileId, req.user!.id);
       logViewAction(req, file.id, req.user!.id);
-      res.status(200).json({ file });
+      res.status(200).json({ file, role });
     } catch (error: any) {
       const status =
         error.message === "Access denied." ? 403
         : error.message.includes("not found") ? 404
         : 500;
+      res.status(status).json({ message: error.message });
+    }
+  }
+
+  static async updateAdminOnlyChat(req: Request, res: Response): Promise<void> {
+    try {
+      const { adminOnlyChat } = req.body;
+      if (typeof adminOnlyChat !== "boolean") {
+        res.status(400).json({ message: "adminOnlyChat must be a boolean." });
+        return;
+      }
+      const file = await fileService.setAdminOnlyChat(req.params.fileId, req.user!.id, adminOnlyChat);
+      res.status(200).json({ adminOnlyChat: file.adminOnlyChat });
+    } catch (error: any) {
+      const status = error.message === "Access denied." ? 403 : error.message.includes("not found") ? 404 : 500;
       res.status(status).json({ message: error.message });
     }
   }

@@ -45,4 +45,10 @@ router.patch(
   VersionController.updatePolicy,
 );
 
+router.patch(
+  "/:fileId/admin-only-chat",
+  requirePermission("owner"),
+  FileController.updateAdminOnlyChat,
+);
+
 export default router;

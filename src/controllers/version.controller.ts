@@ -79,6 +79,24 @@ export class VersionController {
     }
   }
 
+  static async getMyPendingRequest(req: Request, res: Response): Promise<void> {
+    try {
+      const request = await versionService.getMyPendingRequest(req.params.fileId, req.user!.id);
+      res.status(200).json({ request: request ? toClientRequest(request) : null });
+    } catch (error: any) {
+      res.status(statusForError(error.message)).json({ message: error.message });
+    }
+  }
+
+  static async getMyRejectedRequests(req: Request, res: Response): Promise<void> {
+    try {
+      const requests = await versionService.getMyRejectedRequests(req.params.fileId, req.user!.id);
+      res.status(200).json({ requests: requests.map(toClientRequest) });
+    } catch (error: any) {
+      res.status(statusForError(error.message)).json({ message: error.message });
+    }
+  }
+
   static async listPendingRequestsForOwner(req: Request, res: Response): Promise<void> {
     try {
       const requests = await versionService.listPendingRequestsForOwner(req.user!.id);

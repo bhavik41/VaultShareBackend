@@ -31,6 +31,8 @@ router.post(
 );
 
 router.get("/requests", VersionController.listPendingRequests);
+router.get("/my-request", VersionController.getMyPendingRequest);
+router.get("/my-rejected", VersionController.getMyRejectedRequests);
 router.post("/requests/:requestId/approve", VersionController.approveRequest);
 router.post("/requests/:requestId/reject", VersionController.rejectRequest);
 

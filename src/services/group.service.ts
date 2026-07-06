@@ -72,6 +72,7 @@ export async function createNewGroup(
   ownerId: string,
   name: string,
   description?: string,
+  defaultRole: SharedRole = 'viewer',
 ): Promise<Group> {
   if (!name || !name.trim()) throw new Error('Group name is required.')
 
@@ -80,6 +81,7 @@ export async function createNewGroup(
     name: name.trim(),
     description: description?.trim(),
     ownerId,
+    defaultRole,
     createdAt: new Date(),
     updatedAt: new Date(),
   })
@@ -167,7 +169,7 @@ export async function getGroupDetails(groupId: string, requesterId: string) {
 export async function updateGroupDetails(
   groupId: string,
   requesterId: string,
-  updates: { name?: string; description?: string },
+  updates: { name?: string; description?: string; defaultRole?: string },
 ): Promise<Group> {
   await requireGroupOwnerOrAdmin(groupId, requesterId)
 
@@ -175,9 +177,14 @@ export async function updateGroupDetails(
     throw new Error('Group name cannot be empty.')
   }
 
+  const defaultRole = updates.defaultRole !== undefined
+    ? validateSharedRole(updates.defaultRole)
+    : undefined
+
   const updated = await updateGroup(groupId, {
     name: updates.name?.trim(),
     description: updates.description?.trim(),
+    defaultRole,
   })
   if (!updated) throw new Error('Group not found.')
   return updated

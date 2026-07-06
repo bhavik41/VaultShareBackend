@@ -17,6 +17,9 @@ export interface StoredUser {
   // Password reset
   resetOtp: string | null
   resetOtpExpiry: Date | null
+  // Email OTP for signin
+  signinOtp: string | null
+  signinOtpExpiry: Date | null
   // Account lockout (#5)
   failedLoginAttempts: number
   lockoutUntil: Date | null
@@ -34,6 +37,8 @@ function toStoredUser(doc: IUser): StoredUser {
     twoFactorEnabled: doc.twoFactorEnabled,
     resetOtp: doc.resetOtp,
     resetOtpExpiry: doc.resetOtpExpiry,
+    signinOtp: doc.signinOtp ?? null,
+    signinOtpExpiry: doc.signinOtpExpiry ?? null,
     failedLoginAttempts: doc.failedLoginAttempts ?? 0,
     lockoutUntil: doc.lockoutUntil ?? null,
   }
@@ -71,6 +76,8 @@ export const createUser = async (user: StoredUser): Promise<StoredUser> => {
     twoFactorEnabled: user.twoFactorEnabled,
     resetOtp: user.resetOtp,
     resetOtpExpiry: user.resetOtpExpiry,
+    signinOtp: user.signinOtp,
+    signinOtpExpiry: user.signinOtpExpiry,
   })
   return toStoredUser(doc.toObject())
 }
