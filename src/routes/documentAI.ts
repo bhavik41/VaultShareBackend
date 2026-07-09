@@ -32,7 +32,7 @@ router.post(
       const result = await askQuestion(fileId, question.trim());
       res.json(result);
     } catch (err: any) {
-      const status = err.message.includes("not found") ? 404
+const status = err.message.includes("not found") ? 404
         : err.message.includes("not configured") ? 503
         : err.message.includes("Unsupported file type") ? 422
         : 500;
