@@ -146,13 +146,20 @@ async function indexDocument(fileId: string, s3Key: string, mimeType: string): P
 
 const TOP_K = 6; // number of chunks to send to Claude
 
+const DEMO_ANSWERS = [
+  "This is a demo response. In production, the AI reads your actual document and answers based on its content.",
+  "Demo mode is active. Add your ANTHROPIC_API_KEY to .env to get real answers from the document.",
+  "Great question! With a real API key, the AI would scan the relevant sections of this document and give you a precise answer.",
+  "This would normally show a summary extracted from the document's key sections. Add ANTHROPIC_API_KEY to enable real responses.",
+];
+
+let _demoIndex = 0;
+
 export async function askQuestion(
   fileId: string,
   question: string,
 ): Promise<{ answer: string; chunksUsed: number; totalChunks: number }> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured. Add it to your .env file.");
-  }
+  const isDemoMode = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === "";
 
   const file = await FileModel.findById(fileId);
   if (!file) throw new Error("File not found.");
@@ -162,6 +169,12 @@ export async function askQuestion(
   const mimeType = activeVersion?.mimeType ?? file.mimeType;
 
   if (!s3Key) throw new Error("No active file version found. Cannot answer questions about this file.");
+
+  if (isDemoMode) {
+    const answer = DEMO_ANSWERS[_demoIndex % DEMO_ANSWERS.length];
+    _demoIndex++;
+    return { answer, chunksUsed: 0, totalChunks: 0 };
+  }
 
   // Re-index if file has changed or hasn't been indexed yet
   const existingChunk = await DocumentChunkModel.findOne({ fileId });
@@ -184,7 +197,7 @@ export async function askQuestion(
   ranked.sort((a, b) => a.chunk.chunkIndex - b.chunk.chunkIndex);
   const contextText = ranked.map((r, i) => `[Section ${i + 1}]\n${r.chunk.text}`).join("\n\n---\n\n");
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
