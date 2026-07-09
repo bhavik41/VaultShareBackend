@@ -146,13 +146,13 @@ async function indexDocument(fileId: string, s3Key: string, mimeType: string): P
 
 // ─── Q&A ─────────────────────────────────────────────────────────────────────
 
-const TOP_K = 6; // number of chunks to send to Claude
+const TOP_K = 6; // number of highest-scoring chunks sent to the LLM
 
 const DEMO_ANSWERS = [
   "This is a demo response. In production, the AI reads your actual document and answers based on its content.",
-  "Demo mode is active. Add your ANTHROPIC_API_KEY to .env to get real answers from the document.",
-  "Great question! With a real API key, the AI would scan the relevant sections of this document and give you a precise answer.",
-  "This would normally show a summary extracted from the document's key sections. Add ANTHROPIC_API_KEY to enable real responses.",
+  "Demo mode is active. Add your NVIDIA_API_KEY to .env to get real answers from the document.",
+  "Great question! With a real API key, the AI scans the most relevant sections of this document and gives you a precise answer.",
+  "This would normally show a summary extracted from the document's key sections. Add NVIDIA_API_KEY to enable real responses.",
 ];
 
 let _demoIndex = 0;
