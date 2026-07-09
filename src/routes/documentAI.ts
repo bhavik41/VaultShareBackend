@@ -23,8 +23,8 @@ router.post(
       res.status(400).json({ message: "question is required." });
       return;
     }
-    if (question.length > 1000) {
-      res.status(400).json({ message: "Question must be under 1000 characters." });
+    if (question.length > 2000) {
+      res.status(400).json({ message: "Question must be under 2000 characters." });
       return;
     }
 
@@ -32,7 +32,7 @@ router.post(
       const result = await askQuestion(fileId, question.trim());
       res.json(result);
     } catch (err: any) {
-const status = err.message.includes("not found") ? 404
+      const status = err.message.includes("not found") ? 404
         : err.message.includes("not configured") ? 503
         : err.message.includes("Unsupported file type") ? 422
         : 500;
