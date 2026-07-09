@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Anthropic from "@anthropic-ai/sdk";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string; numpages: number }>;
 // mammoth has no @types package — use require
@@ -161,7 +161,7 @@ export async function askQuestion(
   fileId: string,
   question: string,
 ): Promise<{ answer: string; chunksUsed: number; totalChunks: number }> {
-  const isDemoMode = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.trim() === "";
+  const isDemoMode = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === "";
 
   const file = await FileModel.findById(fileId);
   if (!file) throw new Error("File not found.");
@@ -199,10 +199,15 @@ export async function askQuestion(
   ranked.sort((a, b) => a.chunk.chunkIndex - b.chunk.chunkIndex);
   const contextText = ranked.map((r, i) => `[Section ${i + 1}]\n${r.chunk.text}`).join("\n\n---\n\n");
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-  const prompt = `You are a document Q&A assistant. Answer questions based ONLY on the document sections provided below. If the answer is not found in the sections, say "I couldn't find information about that in this document."
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: `You are a document Q&A assistant. Answer questions based ONLY on the document sections provided below. If the answer is not found in the sections, say "I couldn't find information about that in this document."
 
 Document: "${file.originalName}"
 
@@ -211,10 +216,12 @@ ${contextText}
 
 Question: ${question}
 
-Answer concisely and accurately, citing the relevant section when helpful.`;
+Answer concisely and accurately, citing the relevant section when helpful.`,
+      },
+    ],
+  });
 
-  const result = await model.generateContent(prompt);
-  const answer = result.response.text();
+  const answer = (response.content[0] as { text: string }).text;
 
   return {
     answer,
