@@ -13,6 +13,7 @@ import groupsRouter from "./routes/groups";
 import versionsRouter, { versionRequestsRouter } from "./routes/versions";
 import notificationsRouter from "./routes/notifications";
 import documentAIRouter from "./routes/documentAI";
+import previewPdfRouter from "./routes/previewPdf";
 import testRouter from "./routes/test";
 
 const app = express()
@@ -45,6 +46,7 @@ app.use("/api/files/:fileId/versions", versionsRouter);
 app.use("/api/version-requests", versionRequestsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/files/:fileId/ask", documentAIRouter);
+app.use("/api/files/:fileId/preview-pdf", previewPdfRouter);
 
 // Test-only helpers — only mounted when ENABLE_E2E_ROUTES=true
 if (process.env.ENABLE_E2E_ROUTES === "true") {
