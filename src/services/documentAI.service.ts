@@ -187,17 +187,30 @@ export async function askQuestion(
   const allChunks = await DocumentChunkModel.find({ fileId }).sort({ chunkIndex: 1 }).lean();
   if (allChunks.length === 0) throw new Error("Document has no indexed content.");
 
-  // Score and pick top chunks
+  // Score chunks with BM25
   const scores = bm25Scores(question, allChunks);
-  const ranked = allChunks
-    .map((c, i) => ({ chunk: c, score: scores[i] })
-    )
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP_K);
+  const maxScore = Math.max(...scores);
 
-  // Sort selected chunks back into document order for better context
-  ranked.sort((a, b) => a.chunk.chunkIndex - b.chunk.chunkIndex);
-  const contextText = ranked.map((r, i) => `[Section ${i + 1}]\n${r.chunk.text}`).join("\n\n---\n\n");
+  let selected: typeof allChunks;
+  if (maxScore === 0) {
+    // No keyword overlap — send all chunks up to TOP_K spread evenly across the document
+    // so the model sees content from beginning, middle, and end
+    if (allChunks.length <= TOP_K) {
+      selected = allChunks;
+    } else {
+      const step = Math.floor(allChunks.length / TOP_K);
+      selected = Array.from({ length: TOP_K }, (_, i) => allChunks[i * step]);
+    }
+  } else {
+    selected = allChunks
+      .map((c, i) => ({ chunk: c, score: scores[i] }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, TOP_K)
+      .sort((a, b) => a.chunk.chunkIndex - b.chunk.chunkIndex)
+      .map((r) => r.chunk);
+  }
+
+  const contextText = selected.map((c, i) => `[Section ${i + 1}]\n${c.text}`).join("\n\n---\n\n");
 
   const openai = new OpenAI({
     apiKey: process.env.NVIDIA_API_KEY!,
@@ -209,16 +222,16 @@ export async function askQuestion(
     messages: [
       {
         role: "user",
-        content: `You are a document Q&A assistant. Answer questions based ONLY on the document sections provided below. If the answer is not found in the sections, say "I couldn't find information about that in this document."
+        content: `You are a document Q&A assistant. Answer questions based on the document sections provided below. Be helpful and interpret the user's question broadly — if the question uses informal language, find the closest matching information. Only say you couldn't find something if the topic is genuinely absent from ALL sections.
 
 Document: "${file.originalName}"
 
-Relevant sections from the document:
+Document sections:
 ${contextText}
 
 Question: ${question}
 
-Answer concisely and accurately, citing the relevant section when helpful.`,
+Answer concisely and accurately based on the document content above.`,
       },
     ],
     max_tokens: 1024,
@@ -228,7 +241,7 @@ Answer concisely and accurately, citing the relevant section when helpful.`,
 
   return {
     answer,
-    chunksUsed: ranked.length,
+    chunksUsed: selected.length,
     totalChunks: allChunks.length,
   };
 }
