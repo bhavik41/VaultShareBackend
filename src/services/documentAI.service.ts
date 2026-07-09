@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string; numpages: number }>;
 // mammoth has no @types package — use require
@@ -161,7 +161,7 @@ export async function askQuestion(
   fileId: string,
   question: string,
 ): Promise<{ answer: string; chunksUsed: number; totalChunks: number }> {
-  const isDemoMode = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === "";
+  const isDemoMode = !process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.trim() === "";
 
   const file = await FileModel.findById(fileId);
   if (!file) throw new Error("File not found.");
@@ -199,10 +199,10 @@ export async function askQuestion(
   ranked.sort((a, b) => a.chunk.chunkIndex - b.chunk.chunkIndex);
   const contextText = ranked.map((r, i) => `[Section ${i + 1}]\n${r.chunk.text}`).join("\n\n---\n\n");
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
     max_tokens: 1024,
     messages: [
       {
@@ -221,7 +221,7 @@ Answer concisely and accurately, citing the relevant section when helpful.`,
     ],
   });
 
-  const answer = (response.content[0] as { text: string }).text;
+  const answer = response.choices[0].message.content ?? "";
 
   return {
     answer,
