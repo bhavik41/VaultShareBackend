@@ -125,12 +125,14 @@ async function indexDocument(fileId: string, s3Key: string, mimeType: string): P
   const text = await extractText(s3Key, mimeType);
   const chunks = chunkText(text);
 
-  if (chunks.length === 0) throw new Error("Could not extract any text from this document.");
+  const nonEmpty = chunks.filter((c) => c.trim().length > 0);
+  if (nonEmpty.length === 0) throw new Error("Could not extract any readable text from this document. It may be a scanned image-based PDF — try uploading a text-based PDF or a .docx file.");
+  const chunks2 = nonEmpty;
 
   // Delete existing chunks for this file and re-index
   await DocumentChunkModel.deleteMany({ fileId });
 
-  const docs = chunks.map((chunkText, i) => ({
+  const docs = chunks2.map((chunkText, i) => ({
     _id: uuidv4(),
     fileId,
     indexedS3Key: s3Key,
@@ -198,7 +200,7 @@ export async function askQuestion(
   const contextText = ranked.map((r, i) => `[Section ${i + 1}]\n${r.chunk.text}`).join("\n\n---\n\n");
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
   const prompt = `You are a document Q&A assistant. Answer questions based ONLY on the document sections provided below. If the answer is not found in the sections, say "I couldn't find information about that in this document."
 
