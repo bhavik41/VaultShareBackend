@@ -21,7 +21,7 @@ router.get("/me", authenticate, AuthController.me);
 
 // #2 — rate-limited password-reset routes
 router.post("/forgot-password", forgotPasswordLimiter, AuthController.forgotPassword);
-router.post("/reset-password", AuthController.resetPassword);
+router.post("/reset-password", forgotPasswordLimiter, AuthController.resetPassword);
 
 // #3 — rate-limited 2FA routes
 router.post("/2fa/setup", twoFaLimiter, authenticate, AuthController.setup2fa);

@@ -18,6 +18,10 @@ import testRouter from "./routes/test";
 
 const app = express()
 
+// Fix #7 — trust the first proxy hop so req.ip reflects the real client IP,
+// which makes all express-rate-limit per-IP windows work correctly behind nginx/ALB.
+app.set("trust proxy", 1)
+
 // #43-48 — helmet sets X-Content-Type-Options, X-Frame-Options, CSP, HSTS, Referrer-Policy, etc.
 app.use(helmet())
 

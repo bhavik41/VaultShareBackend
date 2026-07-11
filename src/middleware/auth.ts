@@ -27,7 +27,8 @@ export const authenticate = (
 
   try {
     const secret = process.env.JWT_SECRET as string;
-    const decoded = jwt.verify(token, secret) as UserPayload;
+    // Fix #5 — constrain to HS256 to prevent alg:none and RS/ES key-confusion attacks
+    const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] }) as UserPayload;
     req.user = decoded;
     next();
   } catch {

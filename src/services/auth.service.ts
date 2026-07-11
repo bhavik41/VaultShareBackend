@@ -10,6 +10,7 @@ import {
   findUserByRefreshTokenHash,
   createUser,
   updateUser,
+  deleteUser,
 } from "../db/inMemoryStore";
 
 // Account lockout constants (#5)
@@ -75,8 +76,19 @@ export async function signup(data: SignupBody) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) throw new Error("Invalid email address.");
 
-  if (await findUserByEmail(email))
-    throw new Error("An account with this email already exists.");
+  // Fix #6 — stale unverified accounts block legitimate registration.
+  // If an unverified record older than 10 min exists for this email, delete it
+  // and allow the real owner to sign up. Otherwise surface the normal conflict.
+  const existing = await findUserByEmail(email);
+  if (existing) {
+    const stale = !existing.emailVerified &&
+      existing.createdAt < new Date(Date.now() - 10 * 60 * 1000);
+    if (stale) {
+      await deleteUser(existing.id);
+    } else {
+      throw new Error("An account with this email already exists.");
+    }
+  }
 
   // #13 — bcrypt cost raised to 12
   const passwordHash = await bcrypt.hash(password, 12);
@@ -89,20 +101,17 @@ export async function signup(data: SignupBody) {
     refreshToken: null,
     twoFactorSecret: null,
     twoFactorEnabled: false,
+    lastUsedTotpCode: null,
+    lastUsedTotpAt: null,
     resetOtp: null,
     resetOtpExpiry: null,
     signinOtp: null,
     signinOtpExpiry: null,
+    signinOtpAttempts: 0,
     failedLoginAttempts: 0,
     lockoutUntil: null,
+    emailVerified: false,
   });
-
-  const userPayload: UserPayload = {
-    id: newUser.id,
-    email: newUser.email,
-    name: newUser.name,
-    twoFactorEnabled: false,
-  };
 
   const otp = generateOtp();
   const otpHash = await bcrypt.hash(otp, 10);
@@ -162,7 +171,8 @@ export async function signin(data: SigninBody) {
   const otp = generateOtp();
   const otpHash = await bcrypt.hash(otp, 10);
   const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-  await updateUser(user.id, { signinOtp: otpHash, signinOtpExpiry: expiry });
+  // Reset attempt counter whenever a fresh OTP is issued
+  await updateUser(user.id, { signinOtp: otpHash, signinOtpExpiry: expiry, signinOtpAttempts: 0 });
   sendSigninOtpEmail(user.email, otp).catch((err) =>
     console.error("[signin] failed to send OTP email:", err.message),
   );
@@ -189,9 +199,24 @@ export async function verifySigninOtp(tempToken: string, otp: string) {
     throw new Error("Verification code has expired. Please sign in again.");
 
   const otpValid = await bcrypt.compare(otp, user.signinOtp);
-  if (!otpValid) throw new Error("Incorrect verification code.");
+  if (!otpValid) {
+    // Fix #4 — per-user OTP brute-force protection
+    const attempts = (user.signinOtpAttempts ?? 0) + 1;
+    if (attempts >= 5) {
+      await updateUser(user.id, { signinOtp: null, signinOtpExpiry: null, signinOtpAttempts: 0 });
+      throw new Error("Too many incorrect attempts. Please sign in again to receive a new code.");
+    }
+    await updateUser(user.id, { signinOtpAttempts: attempts });
+    throw new Error("Incorrect verification code.");
+  }
 
-  await updateUser(user.id, { signinOtp: null, signinOtpExpiry: null });
+  // Fix #6 — mark email as verified on first successful OTP
+  await updateUser(user.id, {
+    signinOtp: null,
+    signinOtpExpiry: null,
+    signinOtpAttempts: 0,
+    emailVerified: true,
+  });
 
   const userPayload: UserPayload = {
     id: user.id,
@@ -330,6 +355,16 @@ export async function validate2fa(tempToken: string, token: string) {
     throw new Error("2FA not set up for this account.");
   }
 
+  // Fix #2 — TOTP replay: reject a code that was already accepted in this 30-second window
+  const now = new Date();
+  if (
+    user.lastUsedTotpCode === token &&
+    user.lastUsedTotpAt &&
+    now.getTime() - user.lastUsedTotpAt.getTime() < 30_000
+  ) {
+    throw new Error("This code has already been used. Please wait for the next code.");
+  }
+
   const valid = speakeasy.totp.verify({
     secret: user.twoFactorSecret,
     encoding: "base32",
@@ -338,6 +373,8 @@ export async function validate2fa(tempToken: string, token: string) {
   });
 
   if (!valid) throw new Error("Invalid TOTP code.");
+
+  await updateUser(user.id, { lastUsedTotpCode: token, lastUsedTotpAt: now });
 
   const userPayload: UserPayload = {
     id: user.id,
@@ -364,5 +401,12 @@ export async function disable2fa(userId: string, token: string) {
   });
 
   if (!valid) throw new Error("Invalid TOTP code. Cannot disable 2FA.");
-  await updateUser(user.id, { twoFactorEnabled: false, twoFactorSecret: null });
+  // Fix #3 — revoke active sessions so any hijacked session is immediately evicted
+  await updateUser(user.id, {
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    lastUsedTotpCode: null,
+    lastUsedTotpAt: null,
+    refreshToken: null,
+  });
 }
