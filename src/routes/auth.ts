@@ -6,6 +6,7 @@ import {
   signupLimiter,
   forgotPasswordLimiter,
   twoFaLimiter,
+  refreshLimiter,
 } from "../middleware/rateLimiter";
 
 const router = Router();
@@ -14,7 +15,7 @@ const router = Router();
 router.post("/signup", signupLimiter, AuthController.signup);
 router.post("/signin", signinLimiter, AuthController.signin);
 router.post("/signin/verify-otp", signinLimiter, AuthController.verifySigninOtp);
-router.post("/refresh", AuthController.refresh);
+router.post("/refresh", refreshLimiter, AuthController.refresh);
 router.post("/logout", authenticate, AuthController.logout);
 router.get("/me", authenticate, AuthController.me);
 

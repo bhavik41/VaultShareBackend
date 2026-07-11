@@ -39,3 +39,12 @@ export const signupLimiter = rateLimit({
   legacyHeaders: false,
   message: rateLimitMessage("sign-up"),
 });
+
+/** #5 — Refresh token: 30 requests / 15 min per IP */
+export const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage("token refresh"),
+});
