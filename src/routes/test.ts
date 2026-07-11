@@ -36,12 +36,16 @@ router.post("/session", async (req, res) => {
         refreshToken: null,
         twoFactorSecret: null,
         twoFactorEnabled: false,
+        lastUsedTotpCode: null,
+        lastUsedTotpAt: null,
         resetOtp: null,
         resetOtpExpiry: null,
         signinOtp: null,
         signinOtpExpiry: null,
+        signinOtpAttempts: 0,
         failedLoginAttempts: 0,
         lockoutUntil: null,
+        emailVerified: true,
       });
     }
 
