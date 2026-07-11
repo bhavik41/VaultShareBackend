@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "../utils/uuid";
 import {
   findUserByEmail,
   findUserById,
-  findUserByRefreshToken,
+  findUserByRefreshTokenHash,
   createUser,
   updateUser,
 } from "../db/inMemoryStore";
@@ -48,6 +48,10 @@ export function issueTempToken(payload: TempTokenPayload): string {
 
 function generateOtp(): string {
   return crypto.randomInt(100000, 999999).toString();
+}
+
+function hashRefreshToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 export async function getMe(userId: string) {
@@ -197,7 +201,7 @@ export async function verifySigninOtp(tempToken: string, otp: string) {
   };
   const accessToken = issueAccessToken(userPayload);
   const refreshToken = issueRefreshToken(userPayload);
-  await updateUser(user.id, { refreshToken });
+  await updateUser(user.id, { refreshToken: hashRefreshToken(refreshToken) });
 
   return { user, accessToken, refreshToken };
 }
@@ -210,8 +214,18 @@ export async function refresh(refreshToken: string) {
     throw new Error("Invalid or expired refresh token.");
   }
 
-  const user = await findUserByRefreshToken(refreshToken);
-  if (!user || user.id !== decoded.id) {
+  const hash = hashRefreshToken(refreshToken);
+  const user = await findUserByRefreshTokenHash(hash);
+
+  if (!user) {
+    // JWT signature is valid but hash not in DB — token was already rotated.
+    // This is a sign of replay/theft; revoke all sessions for that user.
+    const target = await findUserById(decoded.id);
+    if (target) await updateUser(target.id, { refreshToken: null });
+    throw new Error("Refresh token already used. All sessions have been revoked for security.");
+  }
+
+  if (user.id !== decoded.id) {
     throw new Error("Refresh token revoked or not found.");
   }
 
@@ -223,7 +237,7 @@ export async function refresh(refreshToken: string) {
   };
   const newAccessToken = issueAccessToken(userPayload);
   const newRefreshToken = issueRefreshToken(userPayload);
-  await updateUser(user.id, { refreshToken: newRefreshToken });
+  await updateUser(user.id, { refreshToken: hashRefreshToken(newRefreshToken) });
 
   return { newAccessToken, newRefreshToken };
 }
@@ -333,7 +347,7 @@ export async function validate2fa(tempToken: string, token: string) {
   };
   const accessToken = issueAccessToken(userPayload);
   const refreshToken = issueRefreshToken(userPayload);
-  await updateUser(user.id, { refreshToken });
+  await updateUser(user.id, { refreshToken: hashRefreshToken(refreshToken) });
 
   return { user, accessToken, refreshToken };
 }
