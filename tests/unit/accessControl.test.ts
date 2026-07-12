@@ -9,6 +9,11 @@ jest.mock("../../src/db/collaborationStore", () => ({
   getFileShare: jest.fn(),
 }));
 
+jest.mock("../../src/db/groupStore", () => ({
+  getGroupsForUser: jest.fn().mockResolvedValue([]),
+  getGroupFileShare: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { getFileById } from "../../src/db/fileStore";
 import { getFileShare } from "../../src/db/collaborationStore";
 import { getFilePermission, requireFileAccess } from "../../src/utils/accessControl";
@@ -18,6 +23,7 @@ const mockGetFileShare = jest.mocked(getFileShare);
 
 const file: StoredFile = {
   id: "file-1",
+  name: "report.pdf",
   userId: "owner-1",
   originalName: "report.pdf",
   mimeType: "application/pdf",

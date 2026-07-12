@@ -93,6 +93,7 @@ const mockUpdateVersionPolicy = jest.mocked(fileStore.updateVersionPolicy);
 function baseFile(overrides: Partial<StoredFile> = {}): StoredFile {
   return {
     id: "file-1",
+    name: "report.pdf",
     userId: "owner-1",
     originalName: "report.pdf",
     mimeType: "application/pdf",
@@ -105,7 +106,7 @@ function baseFile(overrides: Partial<StoredFile> = {}): StoredFile {
     versionPolicy: "admin_only",
     activeVersionId: "v1",
     ...overrides,
-  };
+  } as StoredFile;
 }
 
 function multerFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {

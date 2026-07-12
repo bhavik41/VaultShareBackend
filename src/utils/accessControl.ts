@@ -94,7 +94,7 @@ export function getVersionUploadDecision(
   if (policy === "admin_only") return "denied";
 
   if (policy === "role_gated") {
-    return roleRank[role] >= roleRank.viewer ? "request" : "denied";
+    return roleRank[role] >= roleRank.editor ? "request" : "denied";
   }
 
   // open: anyone with at least viewer access can upload directly

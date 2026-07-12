@@ -57,6 +57,7 @@ const mockCreateInvitation = jest.mocked(createInvitation);
 
 const file: StoredFile = {
   id: "file-1",
+  name: "report.pdf",
   userId: "owner-1",
   originalName: "report.pdf",
   mimeType: "application/pdf",
@@ -80,10 +81,16 @@ function user(overrides: Partial<StoredUser>): StoredUser {
     refreshToken: overrides.refreshToken ?? null,
     twoFactorSecret: overrides.twoFactorSecret ?? null,
     twoFactorEnabled: overrides.twoFactorEnabled ?? false,
+    lastUsedTotpCode: overrides.lastUsedTotpCode ?? null,
+    lastUsedTotpAt: overrides.lastUsedTotpAt ?? null,
     resetOtp: overrides.resetOtp ?? null,
     resetOtpExpiry: overrides.resetOtpExpiry ?? null,
+    signinOtp: overrides.signinOtp ?? null,
+    signinOtpExpiry: overrides.signinOtpExpiry ?? null,
+    signinOtpAttempts: overrides.signinOtpAttempts ?? 0,
     failedLoginAttempts: overrides.failedLoginAttempts ?? 0,
     lockoutUntil: overrides.lockoutUntil ?? null,
+    emailVerified: overrides.emailVerified ?? true,
   };
 }
 
