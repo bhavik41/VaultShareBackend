@@ -12,6 +12,7 @@ export interface IVersionRequest {
   isEncrypted: boolean;
   originalName: string;
   changeNote?: string;
+  sha256?: string;
   status: VersionRequestStatus;
   reviewedBy: string | null;
   reviewedAt: Date | null;
@@ -28,6 +29,7 @@ const versionRequestSchema = new Schema<IVersionRequest>({
   isEncrypted: { type: Boolean, default: false },
   originalName: { type: String, required: true },
   changeNote: { type: String },
+  sha256: { type: String },
   status: {
     type: String,
     enum: ["pending", "approved", "rejected"],

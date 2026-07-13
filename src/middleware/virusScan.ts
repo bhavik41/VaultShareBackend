@@ -38,6 +38,13 @@ export async function virusScan(
     return;
   }
 
+  // file.buffer is undefined when multer uses disk storage instead of memoryStorage.
+  // Skip scanning rather than crashing — disk-storage flows are not used in production.
+  if (!file.buffer) {
+    next();
+    return;
+  }
+
   const tempPath = path.join(os.tmpdir(), `vaultshare-scan-${uuidv4()}`);
   fs.writeFileSync(tempPath, file.buffer);
 

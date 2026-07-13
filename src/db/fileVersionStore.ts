@@ -14,6 +14,7 @@ export interface StoredFileVersion {
   changeNote?: string;
   isActive: boolean;
   isEncrypted: boolean;
+  sha256?: string;
   createdAt: Date;
 }
 
@@ -30,6 +31,7 @@ function toStored(doc: IFileVersion): StoredFileVersion {
     changeNote: doc.changeNote,
     isActive: doc.isActive,
     isEncrypted: doc.isEncrypted,
+    sha256: doc.sha256,
     createdAt: doc.createdAt,
   };
 }
@@ -51,6 +53,7 @@ export async function createFileVersion(input: {
   mimeType: string;
   changeNote?: string;
   isEncrypted: boolean;
+  sha256?: string;
 }): Promise<StoredFileVersion> {
   const doc = await FileVersionModel.create({
     _id: uuidv4(),

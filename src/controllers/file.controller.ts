@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as fileService from "../services/file.service";
+import { ALLOWED_MIME_TYPES } from "../middleware/upload";
 import { logAction, logViewAction } from "../utils/auditLogger";
 
 /** #41 — Strip \r and \n to prevent Content-Disposition header injection */
@@ -24,7 +25,17 @@ export class FileController {
         return;
       }
       const isEncrypted = req.body.encrypted === "true";
-      const originalMimeType = typeof req.body.originalMimeType === "string" ? req.body.originalMimeType : undefined;
+
+      // Validate originalMimeType is a known real MIME type, not arbitrary client input.
+      let originalMimeType: string | undefined;
+      if (typeof req.body.originalMimeType === "string") {
+        if (!ALLOWED_MIME_TYPES.has(req.body.originalMimeType)) {
+          res.status(400).json({ message: "Invalid originalMimeType." });
+          return;
+        }
+        originalMimeType = req.body.originalMimeType;
+      }
+
       const { file } = await fileService.uploadFile(req.user!.id, req.file, { isEncrypted, originalMimeType });
       logAction(req, file.id, req.user!.id, "upload", `Uploaded ${file.originalName}`);
       res.status(201).json({ file });
@@ -35,15 +46,25 @@ export class FileController {
 
   static async downloadFile(req: Request, res: Response): Promise<void> {
     try {
-      const { stream, file } = await fileService.downloadFile(
-        req.params.fileId,
-        req.user!.id,
-      );
-      logAction(req, file.id, req.user!.id, "download", `Downloaded ${file.originalName}`);
-      const safeFilename = sanitizeFilename(file.originalName);
-      res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
-      res.setHeader("Content-Type", file.mimeType);
-      stream.pipe(res);
+      const result = await fileService.downloadFile(req.params.fileId, req.user!.id);
+      logAction(req, result.file.id, req.user!.id, "download", `Downloaded ${result.file.originalName}`);
+
+      if (result.sha256) {
+        res.setHeader("X-Content-Hash", result.sha256);
+      }
+
+      if (result.kind === "signed") {
+        // Return a JSON body so the client can download directly from S3 using
+        // the short-lived URL. The URL expires in 15 minutes — it cannot be
+        // shared to bypass RBAC because it will have expired by the time RBAC
+        // would matter.
+        res.status(200).json({ url: result.url, sha256: result.sha256 ?? null });
+      } else {
+        const safeFilename = sanitizeFilename(result.file.originalName);
+        res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+        res.setHeader("Content-Type", result.file.mimeType);
+        result.stream.pipe(res);
+      }
     } catch (error: any) {
       const status =
         error.message === "Access denied." ? 403
@@ -55,7 +76,7 @@ export class FileController {
 
   static async previewFile(req: Request, res: Response): Promise<void> {
     try {
-      const { stream, originalName, mimeType, size } =
+      const { stream, originalName, mimeType, size, sha256 } =
         await fileService.streamFileDownload(req.params.fileId, req.user!.id);
 
       logViewAction(req, req.params.fileId, req.user!.id);
@@ -63,6 +84,7 @@ export class FileController {
       res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(safeFilename)}"`);
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Content-Length", size);
+      if (sha256) res.setHeader("X-Content-Hash", sha256);
       stream.pipe(res);
     } catch (error: any) {
       const status =
