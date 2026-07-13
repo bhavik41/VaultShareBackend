@@ -22,8 +22,38 @@ const app = express()
 // which makes all express-rate-limit per-IP windows work correctly behind nginx/ALB.
 app.set("trust proxy", 1)
 
-// #43-48 — helmet sets X-Content-Type-Options, X-Frame-Options, CSP, HSTS, Referrer-Policy, etc.
-app.use(helmet())
+app.use(
+  helmet({
+    // HSTS: tell browsers to only use HTTPS for 1 year, including subdomains
+    strictTransportSecurity: {
+      maxAge: 31_536_000,
+      includeSubDomains: true,
+    },
+    xContentTypeOptions: true,
+    // X-Frame-Options: DENY — no iframing at all
+    frameguard: { action: "deny" },
+    // Referrer-Policy: only send origin when crossing schemes/hosts
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    // CSP: lock down script/style/connect sources; allow same-origin fetch for API calls
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        // Allow fetch to S3 for presigned download URLs
+        connectSrc: ["'self'", "https://*.amazonaws.com"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'", "blob:"],
+        frameSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+  }),
+)
 
 const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173").split(",").map((s) => s.trim())
 app.use(cors({ origin: allowedOrigins, credentials: true }))

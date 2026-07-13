@@ -5,7 +5,7 @@ import type { Request, Response, NextFunction } from "express";
 // #32 — image/svg+xml removed from allowlist (SVG can embed JS); serve separately as attachment only
 // #33 — application/octet-stream removed (catch-all that bypasses the allowlist)
 // application/vaultshare-encrypted is the internal sentinel for client-side AES-GCM encrypted uploads
-const ALLOWED_MIME_TYPES = new Set([
+export const ALLOWED_MIME_TYPES = new Set([
   "application/vaultshare-encrypted",
   "application/pdf",
   "application/msword",

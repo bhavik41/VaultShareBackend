@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import * as s3Service from "./s3.service";
 import * as auditService from "./audit.service";
 import { MAX_USER_STORAGE_BYTES } from "./file.service";
@@ -75,6 +76,7 @@ export async function uploadVersionDirect(
 
   const versionNumber = await getNextVersionNumber(fileId);
   const isEncrypted = options.isEncrypted ?? false;
+  const sha256 = crypto.createHash("sha256").update(multerFile.buffer).digest("hex");
   const s3Key = s3Service.buildVersionKey(file.userId, fileId, versionNumber, multerFile.originalname);
   await s3Service.putObject(s3Key, multerFile.buffer, multerFile.mimetype);
 
@@ -88,6 +90,7 @@ export async function uploadVersionDirect(
     mimeType: multerFile.mimetype,
     changeNote: options.changeNote,
     isEncrypted,
+    sha256,
   });
 
   auditService.logAction(
@@ -115,6 +118,7 @@ export async function requestVersionUpload(
 
   const stagingKey = s3Service.buildStagingKey(fileId, multerFile.originalname);
   await s3Service.putObject(stagingKey, multerFile.buffer, multerFile.mimetype);
+  const sha256 = crypto.createHash("sha256").update(multerFile.buffer).digest("hex");
 
   const request = await createVersionRequest({
     fileId,
@@ -125,6 +129,7 @@ export async function requestVersionUpload(
     isEncrypted: options.isEncrypted ?? false,
     originalName: multerFile.originalname,
     changeNote: options.changeNote,
+    sha256,
   });
 
   auditService.logAction(
@@ -207,6 +212,7 @@ export async function approveVersionRequest(
     mimeType: request.mimeType,
     changeNote: request.changeNote,
     isEncrypted: request.isEncrypted,
+    sha256: request.sha256,
   });
 
   await updateVersionRequestStatus(requestId, "approved", adminUserId);

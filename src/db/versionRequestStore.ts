@@ -11,6 +11,7 @@ export interface StoredVersionRequest {
   isEncrypted: boolean;
   originalName: string;
   changeNote?: string;
+  sha256?: string;
   status: VersionRequestStatus;
   reviewedBy: string | null;
   reviewedAt: Date | null;
@@ -28,6 +29,7 @@ function toStored(doc: IVersionRequest): StoredVersionRequest {
     isEncrypted: doc.isEncrypted,
     originalName: doc.originalName,
     changeNote: doc.changeNote,
+    sha256: doc.sha256,
     status: doc.status,
     reviewedBy: doc.reviewedBy,
     reviewedAt: doc.reviewedAt,
@@ -44,6 +46,7 @@ export async function createVersionRequest(input: {
   isEncrypted: boolean;
   originalName: string;
   changeNote?: string;
+  sha256?: string;
 }): Promise<StoredVersionRequest> {
   const doc = await VersionRequestModel.create({
     _id: uuidv4(),

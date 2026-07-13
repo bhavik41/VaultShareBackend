@@ -12,6 +12,7 @@ export interface IFileVersion {
   changeNote?: string;
   isActive: boolean;
   isEncrypted: boolean;
+  sha256?: string;
   createdAt: Date;
 }
 
@@ -27,6 +28,7 @@ const fileVersionSchema = new Schema<IFileVersion>({
   changeNote: { type: String },
   isActive: { type: Boolean, default: false },
   isEncrypted: { type: Boolean, default: false },
+  sha256: { type: String },
   createdAt: { type: Date, default: () => new Date() },
 });
 
