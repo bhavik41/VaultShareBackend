@@ -7,6 +7,7 @@ import {
   forgotPasswordLimiter,
   twoFaLimiter,
   refreshLimiter,
+  reauthLimiter,
 } from "../middleware/rateLimiter";
 
 const router = Router();
@@ -18,6 +19,10 @@ router.post("/signin/verify-otp", signinLimiter, AuthController.verifySigninOtp)
 router.post("/refresh", refreshLimiter, AuthController.refresh);
 router.post("/logout", authenticate, AuthController.logout);
 router.get("/me", authenticate, AuthController.me);
+
+// Idle-timeout re-authentication — session stays valid, gates the UI client-side
+router.post("/reauth/request-otp", reauthLimiter, authenticate, AuthController.requestReauthOtp);
+router.post("/reauth/verify-otp", reauthLimiter, authenticate, AuthController.verifyReauthOtp);
 
 // #2 — rate-limited password-reset routes
 router.post("/forgot-password", forgotPasswordLimiter, AuthController.forgotPassword);

@@ -23,7 +23,7 @@ import type {
   UserPayload,
   TempTokenPayload,
 } from "../types/index";
-import { sendPasswordResetEmail, sendSigninOtpEmail } from "../utils/email";
+import { sendPasswordResetEmail, sendSigninOtpEmail, sendReauthOtpEmail } from "../utils/email";
 
 // #82, #83 — Fail fast at startup if required secrets are missing, no fallback chaining
 export const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -269,6 +269,44 @@ export async function refresh(refreshToken: string) {
 
 export async function logout(userId: string) {
   await updateUser(userId, { refreshToken: null });
+}
+
+// Idle-timeout re-authentication — session/token stay valid, the UI is just
+// gated client-side until a fresh OTP is entered. Reuses the signinOtp fields
+// since a user can't be mid-signin and mid-reauth-lock at the same time.
+export async function requestReauthOtp(userId: string) {
+  const user = await findUserById(userId);
+  if (!user) throw new Error("User not found.");
+
+  const otp = generateOtp();
+  const otpHash = await bcrypt.hash(otp, 10);
+  const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+  await updateUser(user.id, { signinOtp: otpHash, signinOtpExpiry: expiry, signinOtpAttempts: 0 });
+  sendReauthOtpEmail(user.email, otp).catch((err) =>
+    console.error("[reauth] failed to send OTP email:", err.message),
+  );
+}
+
+export async function verifyReauthOtp(userId: string, otp: string) {
+  const user = await findUserById(userId);
+  if (!user || !user.signinOtp || !user.signinOtpExpiry)
+    throw new Error("Invalid or expired code. Request a new one.");
+
+  if (user.signinOtpExpiry < new Date())
+    throw new Error("Code has expired. Request a new one.");
+
+  const otpValid = await bcrypt.compare(otp, user.signinOtp);
+  if (!otpValid) {
+    const attempts = (user.signinOtpAttempts ?? 0) + 1;
+    if (attempts >= 5) {
+      await updateUser(user.id, { signinOtp: null, signinOtpExpiry: null, signinOtpAttempts: 0 });
+      throw new Error("Too many incorrect attempts. Request a new code.");
+    }
+    await updateUser(user.id, { signinOtpAttempts: attempts });
+    throw new Error("Incorrect code.");
+  }
+
+  await updateUser(user.id, { signinOtp: null, signinOtpExpiry: null, signinOtpAttempts: 0 });
 }
 
 export async function forgotPassword(email: string) {

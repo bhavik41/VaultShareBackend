@@ -110,6 +110,32 @@ export class AuthController {
     res.status(200).json({ message: "Logged out successfully." });
   }
 
+  static async requestReauthOtp(req: Request, res: Response): Promise<void> {
+    try {
+      await authService.requestReauthOtp(req.user!.id);
+      res.status(200).json({ message: "A code has been sent to your email." });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+
+  static async verifyReauthOtp(
+    req: Request<object, object, { otp: string }>,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { otp } = req.body;
+      if (!otp) {
+        res.status(400).json({ message: "otp is required." });
+        return;
+      }
+      await authService.verifyReauthOtp(req.user!.id, otp);
+      res.status(200).json({ message: "Session unlocked." });
+    } catch (error: any) {
+      res.status(401).json({ message: error.message });
+    }
+  }
+
   static async me(req: Request, res: Response): Promise<void> {
     try {
       const user = await authService.getMe(req.user!.id);

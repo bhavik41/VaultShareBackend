@@ -48,3 +48,12 @@ export const refreshLimiter = rateLimit({
   legacyHeaders: false,
   message: rateLimitMessage("token refresh"),
 });
+
+/** Idle-timeout re-authentication: 10 requests / 15 min per IP */
+export const reauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage("re-authentication"),
+});

@@ -48,6 +48,13 @@ export const sendSigninOtpEmail = (to: string, otp: string) =>
     text: `Your sign-in verification code is: ${otp}\n\nThis code expires in 10 minutes. If you did not attempt to sign in, please change your password immediately.`,
   })
 
+export const sendReauthOtpEmail = (to: string, otp: string) =>
+  send({
+    to,
+    subject: "VaultShare — Session Unlock Code",
+    text: `Your session was locked after a period of inactivity. Your unlock code is: ${otp}\n\nThis code expires in 5 minutes. If this wasn't you, please change your password immediately.`,
+  })
+
 export const sendGroupAccessEmail = (
   to: string,
   groupName: string,
