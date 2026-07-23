@@ -5,29 +5,37 @@ import {
   Group,
   GroupMember,
   GroupFileShare,
+  GroupInvitation,
   GroupRole,
   SharedRole,
   addGroupMember,
   createGroup,
   createGroupFileShare,
+  createGroupInvitation,
   deleteGroup,
   getFileGroupShares,
   getGroupById,
   getGroupFileShare,
   getGroupFileShares,
+  getGroupInvitationById,
   getGroupMember,
   getGroupMembers,
   getGroupsByOwner,
   getGroupsForUser,
+  getInvitationsForGroup,
+  getInvitationsForUser,
+  getPendingInvitation,
   removeAllGroupFileShares,
+  removeAllGroupInvitations,
   removeAllGroupMembers,
   removeGroupFileShare,
   removeGroupMember,
   updateGroup,
   updateGroupFileShareRole,
   updateGroupMemberRole,
+  updateInvitationStatus,
 } from '../db/groupStore'
-import { sendFileSharedEmail, sendGroupAccessEmail } from '../utils/email'
+import { sendFileSharedEmail, sendGroupAccessEmail, sendGroupInviteEmail } from '../utils/email'
 
 export function validateGroupRole(role: string): GroupRole {
   if (role === 'viewer' || role === 'editor' || role === 'admin') return role
@@ -198,6 +206,7 @@ export async function deleteGroupById(groupId: string, requesterId: string): Pro
   await Promise.all([
     removeAllGroupMembers(groupId),
     removeAllGroupFileShares(groupId),
+    removeAllGroupInvitations(groupId),
   ])
   await deleteGroup(groupId)
 }
@@ -209,31 +218,93 @@ export async function addMemberToGroup(
   requesterId: string,
   memberEmail: string,
   role: string,
-): Promise<GroupMember> {
+): Promise<GroupInvitation> {
   const validRole = validateGroupRole(role)
   await requireGroupOwnerOrAdmin(groupId, requesterId)
 
   const user = await findUserByEmail(memberEmail)
   if (!user) throw new Error('User with that email does not have an account.')
 
-  if (user.id === requesterId) throw new Error('You cannot add yourself as a member.')
+  if (user.id === requesterId) throw new Error('You cannot invite yourself.')
 
   const group = await getGroupById(groupId)
   if (!group) throw new Error('Group not found.')
-  if (group.ownerId === user.id) throw new Error('The group owner cannot be added as a member.')
+  if (group.ownerId === user.id) throw new Error('The group owner cannot be invited as a member.')
 
   const existing = await getGroupMember(groupId, user.id)
   if (existing) throw new Error('User is already a member of this group.')
 
-  const member = await addGroupMember({
+  const pendingInvite = await getPendingInvitation(groupId, user.id)
+  if (pendingInvite) throw new Error('User already has a pending invitation to this group.')
+
+  const inviter = await findUserById(requesterId)
+  const inviterName = inviter?.name ?? 'Someone'
+
+  const invitation = await createGroupInvitation({
     id: uuidv4(),
     groupId,
-    userId: user.id,
+    inviterId: requesterId,
+    inviteeId: user.id,
+    inviteeEmail: memberEmail,
     role: validRole,
-    joinedAt: new Date(),
+    status: 'pending',
+    createdAt: new Date(),
   })
 
-  return member
+  const frontendUrl = (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',')[0]
+  const acceptUrl = `${frontendUrl}/groups?invite=${invitation.id}`
+
+  await sendGroupInviteEmail(user.email, group.name, inviterName, validRole, acceptUrl).catch(() => {})
+
+  return invitation
+}
+
+export async function getMyInvitations(userId: string) {
+  const invitations = await getInvitationsForUser(userId)
+  return Promise.all(
+    invitations.map(async (inv) => {
+      const group = await getGroupById(inv.groupId)
+      const inviter = await findUserById(inv.inviterId)
+      return {
+        id: inv.id,
+        groupId: inv.groupId,
+        groupName: group?.name ?? 'Unknown Group',
+        inviterName: inviter?.name ?? 'Unknown',
+        inviterEmail: inviter?.email ?? '',
+        role: inv.role,
+        createdAt: inv.createdAt,
+      }
+    }),
+  )
+}
+
+export async function respondToGroupInvitation(
+  invitationId: string,
+  userId: string,
+  accept: boolean,
+): Promise<void> {
+  const invitation = await getGroupInvitationById(invitationId)
+  if (!invitation) throw new Error('Invitation not found.')
+  if (invitation.inviteeId !== userId) throw new Error('Access denied.')
+  if (invitation.status !== 'pending') throw new Error('Invitation has already been responded to.')
+
+  if (accept) {
+    const group = await getGroupById(invitation.groupId)
+    if (!group) throw new Error('Group no longer exists.')
+
+    const existing = await getGroupMember(invitation.groupId, userId)
+    if (existing) throw new Error('You are already a member of this group.')
+
+    await addGroupMember({
+      id: uuidv4(),
+      groupId: invitation.groupId,
+      userId,
+      role: invitation.role,
+      joinedAt: new Date(),
+    })
+  }
+
+  await updateInvitationStatus(invitationId, accept ? 'accepted' : 'rejected')
 }
 
 export async function updateMemberRole(

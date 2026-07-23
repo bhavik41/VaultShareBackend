@@ -14,6 +14,10 @@ router.get('/:groupId', GroupController.getGroup)
 router.put('/:groupId', GroupController.updateGroup)
 router.delete('/:groupId', GroupController.deleteGroup)
 
+// ── Invitations ──────────────────────────────────────────────────────────────
+router.get('/invitations/mine', GroupController.getMyInvitations)
+router.patch('/invitations/:invitationId/respond', GroupController.respondToInvitation)
+
 // ── Members ───────────────────────────────────────────────────────────────────
 router.post('/:groupId/members', GroupController.addMember)
 router.get('/:groupId/members', GroupController.listMembers)

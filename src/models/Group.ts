@@ -63,6 +63,35 @@ const groupFileShareSchema = new Schema<IGroupFileShare>({
 
 groupFileShareSchema.index({ groupId: 1, fileId: 1 }, { unique: true })
 
+export type InviteStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface IGroupInvitation {
+  _id: string
+  groupId: string
+  inviterId: string
+  inviteeId: string
+  inviteeEmail: string
+  role: GroupRole
+  status: InviteStatus
+  createdAt: Date
+  respondedAt?: Date
+}
+
+const groupInvitationSchema = new Schema<IGroupInvitation>({
+  _id: { type: String },
+  groupId: { type: String, required: true, index: true },
+  inviterId: { type: String, required: true },
+  inviteeId: { type: String, required: true, index: true },
+  inviteeEmail: { type: String, required: true },
+  role: { type: String, enum: ['viewer', 'editor', 'admin'], required: true },
+  status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+  createdAt: { type: Date, default: () => new Date() },
+  respondedAt: { type: Date },
+})
+
+groupInvitationSchema.index({ groupId: 1, inviteeId: 1 })
+
 export const GroupModel = model<IGroup>('Group', groupSchema)
 export const GroupMemberModel = model<IGroupMember>('GroupMember', groupMemberSchema)
 export const GroupFileShareModel = model<IGroupFileShare>('GroupFileShare', groupFileShareSchema)
+export const GroupInvitationModel = model<IGroupInvitation>('GroupInvitation', groupInvitationSchema)

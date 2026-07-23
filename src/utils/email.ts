@@ -104,3 +104,16 @@ export const sendVersionRejectedEmail = (to: string, fileName: string) =>
     subject: `VaultShare — Your version upload for "${fileName}" was rejected`,
     text: `Your requested version upload for "${fileName}" was rejected by the file owner.`,
   })
+
+export const sendGroupInviteEmail = (
+  to: string,
+  groupName: string,
+  inviterName: string,
+  role: string,
+  acceptUrl: string,
+) =>
+  send({
+    to,
+    subject: `VaultShare — You've been invited to join "${groupName}"`,
+    text: `${inviterName} has invited you to join the group "${groupName}" as a ${role}.\n\nTo accept or reject this invitation, visit:\n${acceptUrl}\n\nIf you did not expect this invitation, you can safely ignore this email.`,
+  })

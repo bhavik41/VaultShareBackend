@@ -34,23 +34,30 @@ router.get(
       return;
     }
 
-    // Stream PPTX from S3 into a buffer
-    const stream = await getObjectStream(version.s3Key);
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    try {
+      const stream = await getObjectStream(version.s3Key);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const pptxBuf = Buffer.concat(chunks);
+
+      const pdfBuf = await convertAsync(pptxBuf, ".pdf", undefined);
+
+      res.set({
+        "Content-Type": "application/pdf",
+        "Content-Length": pdfBuf.length,
+        "Cache-Control": "private, max-age=300",
+      });
+      res.send(pdfBuf);
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("soffice")) {
+        res.status(501).json({ message: "LibreOffice is not installed on the server." });
+      } else {
+        res.status(500).json({ message: "PDF conversion failed." });
+      }
     }
-    const pptxBuf = Buffer.concat(chunks);
-
-    // Convert to PDF using LibreOffice (headless)
-    const pdfBuf = await convertAsync(pptxBuf, ".pdf", undefined);
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Length": pdfBuf.length,
-      "Cache-Control": "private, max-age=300",
-    });
-    res.send(pdfBuf);
   },
 );
 

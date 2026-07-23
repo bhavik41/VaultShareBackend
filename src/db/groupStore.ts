@@ -2,14 +2,17 @@ import {
   GroupModel,
   GroupMemberModel,
   GroupFileShareModel,
+  GroupInvitationModel,
   IGroup,
   IGroupMember,
   IGroupFileShare,
+  IGroupInvitation,
   GroupRole,
   SharedRole,
+  InviteStatus,
 } from '../models/Group'
 
-export { GroupRole, SharedRole }
+export { GroupRole, SharedRole, InviteStatus }
 
 export interface Group {
   id: string
@@ -229,4 +232,82 @@ export const removeGroupFileShare = async (
 
 export const removeAllGroupFileShares = async (groupId: string): Promise<void> => {
   await GroupFileShareModel.deleteMany({ groupId })
+}
+
+// ── Group Invitations ────────────────────────────────────────────────────────
+
+export interface GroupInvitation {
+  id: string
+  groupId: string
+  inviterId: string
+  inviteeId: string
+  inviteeEmail: string
+  role: GroupRole
+  status: InviteStatus
+  createdAt: Date
+  respondedAt?: Date
+}
+
+function toGroupInvitation(doc: IGroupInvitation): GroupInvitation {
+  return {
+    id: doc._id,
+    groupId: doc.groupId,
+    inviterId: doc.inviterId,
+    inviteeId: doc.inviteeId,
+    inviteeEmail: doc.inviteeEmail,
+    role: doc.role,
+    status: doc.status,
+    createdAt: doc.createdAt,
+    respondedAt: doc.respondedAt,
+  }
+}
+
+export const createGroupInvitation = async (inv: GroupInvitation): Promise<GroupInvitation> => {
+  const doc = await GroupInvitationModel.create({
+    _id: inv.id,
+    groupId: inv.groupId,
+    inviterId: inv.inviterId,
+    inviteeId: inv.inviteeId,
+    inviteeEmail: inv.inviteeEmail,
+    role: inv.role,
+    status: inv.status,
+    createdAt: inv.createdAt,
+  })
+  return toGroupInvitation(doc.toObject())
+}
+
+export const getGroupInvitationById = async (id: string): Promise<GroupInvitation | undefined> => {
+  const doc = await GroupInvitationModel.findById(id).lean()
+  return doc ? toGroupInvitation(doc) : undefined
+}
+
+export const getPendingInvitation = async (groupId: string, inviteeId: string): Promise<GroupInvitation | undefined> => {
+  const doc = await GroupInvitationModel.findOne({ groupId, inviteeId, status: 'pending' }).lean()
+  return doc ? toGroupInvitation(doc) : undefined
+}
+
+export const getInvitationsForUser = async (userId: string): Promise<GroupInvitation[]> => {
+  const docs = await GroupInvitationModel.find({ inviteeId: userId, status: 'pending' }).sort({ createdAt: -1 }).lean()
+  return docs.map(toGroupInvitation)
+}
+
+export const getInvitationsForGroup = async (groupId: string): Promise<GroupInvitation[]> => {
+  const docs = await GroupInvitationModel.find({ groupId }).sort({ createdAt: -1 }).lean()
+  return docs.map(toGroupInvitation)
+}
+
+export const updateInvitationStatus = async (
+  id: string,
+  status: InviteStatus,
+): Promise<GroupInvitation | undefined> => {
+  const doc = await GroupInvitationModel.findByIdAndUpdate(
+    id,
+    { status, respondedAt: new Date() },
+    { new: true },
+  ).lean()
+  return doc ? toGroupInvitation(doc) : undefined
+}
+
+export const removeAllGroupInvitations = async (groupId: string): Promise<void> => {
+  await GroupInvitationModel.deleteMany({ groupId })
 }

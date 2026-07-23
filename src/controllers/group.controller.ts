@@ -75,8 +75,8 @@ export class GroupController {
         res.status(400).json({ message: 'email and role are required.' })
         return
       }
-      const member = await groupService.addMemberToGroup(groupId, req.user!.id, email, role)
-      res.status(201).json({ message: 'Member added.', member })
+      const invitation = await groupService.addMemberToGroup(groupId, req.user!.id, email, role)
+      res.status(201).json({ message: 'Invitation sent.', invitation })
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message })
     }
@@ -112,6 +112,32 @@ export class GroupController {
       const { groupId, userId } = req.params
       await groupService.removeMemberFromGroup(groupId, req.user!.id, userId)
       res.status(200).json({ message: 'Member removed.' })
+    } catch (error: any) {
+      res.status(getErrorStatus(error.message)).json({ message: error.message })
+    }
+  }
+
+  // ── Invitations ─────────────────────────────────────────────────────────────
+
+  static async getMyInvitations(req: Request, res: Response): Promise<void> {
+    try {
+      const invitations = await groupService.getMyInvitations(req.user!.id)
+      res.status(200).json({ invitations })
+    } catch (error: any) {
+      res.status(500).json({ message: error.message })
+    }
+  }
+
+  static async respondToInvitation(req: Request, res: Response): Promise<void> {
+    try {
+      const { invitationId } = req.params
+      const { accept } = req.body
+      if (typeof accept !== 'boolean') {
+        res.status(400).json({ message: 'accept (boolean) is required.' })
+        return
+      }
+      await groupService.respondToGroupInvitation(invitationId, req.user!.id, accept)
+      res.status(200).json({ message: accept ? 'Invitation accepted. You are now a member.' : 'Invitation rejected.' })
     } catch (error: any) {
       res.status(getErrorStatus(error.message)).json({ message: error.message })
     }
